@@ -1,7 +1,11 @@
 import axios from "axios";
 
+// In production, VITE_API_URL points to the deployed backend (e.g. https://your-backend.vercel.app/api)
+// In development, requests go to /api which Vite proxies to localhost:8000
+const BASE_URL = import.meta.env.VITE_API_URL || "/api";
+
 export const apiClient = axios.create({
-  baseURL: "/api",
+  baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -53,6 +57,15 @@ export interface TestResult {
   timestamp: string;
 }
 
+export interface RunStarted {
+  /** The run is in progress — poll GET /results?run_id to watch results arrive */
+  run_id: string;
+  total: number;
+  data_source?: "auto" | "file" | "columns";
+  data_columns?: string[];
+  data_row_count?: number | null;
+}
+
 export interface RunSummary {
   run_id: string;
   total: number;
@@ -62,21 +75,31 @@ export interface RunSummary {
   success_rate: number;
   total_duration: number;
   started_at: string;
+  // data source info (returned by the updated /run endpoint)
+  data_source?: "auto" | "file" | "columns";
+  data_columns?: string[];
+  data_row_count?: number | null;
 }
 
-export interface VehicleTelemetry {
+export interface SchemaField {
+  name: string;
+  type: "string" | "integer" | "float" | "boolean" | "datetime";
+  description: string;
+}
+
+export interface PreviewDataset {
+  schema_fields: SchemaField[];
+  rows: Record<string, unknown>[];
+}
+
+export interface SyntheticDataset {
   id: string;
-  vehicle_id: string;
-  lat: number;
-  lng: number;
-  engine_temp: number;
-  rpm: number;
-  fuel_level: number;
-  oil_pressure: number;
-  speed: number;
-  trip_id: string;
-  status: "Active" | "Idle" | "Maintenance";
-  timestamp: string;
+  requirement_id: string;
+  requirement_text: string;
+  count: number;
+  schema_fields: SchemaField[];
+  rows: Record<string, unknown>[];
+  generated_at: string;
 }
 
 export interface PrioritizedTest {
@@ -134,12 +157,25 @@ export const api = {
       .then((r) => r.data),
 
   // Test Execution
-  runTests: (requirementId?: string) =>
-    apiClient
-      .post<RunSummary>("/test-execution/run", null, {
-        params: requirementId ? { requirement_id: requirementId } : {},
+  runTests: (payload: {
+    dataSource: "auto" | "file" | "columns";
+    requirementId?: string;
+    columns?: string;
+    file?: File;
+    previewRows?: Record<string, unknown>[];
+  }) => {
+    const fd = new FormData();
+    fd.append("data_source", payload.dataSource);
+    if (payload.requirementId) fd.append("requirement_id", payload.requirementId);
+    if (payload.columns) fd.append("columns", payload.columns);
+    if (payload.file) fd.append("file", payload.file);
+    if (payload.previewRows) fd.append("preview_rows", JSON.stringify(payload.previewRows));
+    return apiClient
+      .post<RunStarted>("/test-execution/run", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
       })
-      .then((r) => r.data),
+      .then((r) => r.data);
+  },
 
   getResults: (runId?: string, limit = 100) =>
     apiClient
@@ -152,13 +188,18 @@ export const api = {
     apiClient.get<RunSummary>(`/test-execution/runs/${runId}`).then((r) => r.data),
 
   // Synthetic Data
-  generateSyntheticData: (count = 20, scenario?: string) =>
+  previewSyntheticData: (requirement_id: string, count = 20) =>
     apiClient
-      .post<{ count: number; records: VehicleTelemetry[] }>("/synthetic-data/generate", { count, scenario })
+      .post<PreviewDataset>("/synthetic-data/preview", { requirement_id, count })
       .then((r) => r.data),
 
-  getSyntheticData: (limit = 50) =>
-    apiClient.get<VehicleTelemetry[]>("/synthetic-data", { params: { limit } }).then((r) => r.data),
+  generateSyntheticData: (requirement_id: string, count = 20) =>
+    apiClient
+      .post<SyntheticDataset>("/synthetic-data/generate", { requirement_id, count })
+      .then((r) => r.data),
+
+  getSyntheticDatasets: (limit = 10) =>
+    apiClient.get<SyntheticDataset[]>("/synthetic-data", { params: { limit } }).then((r) => r.data),
 
   // Prioritization
   getPrioritizedTests: (refresh = false) =>
