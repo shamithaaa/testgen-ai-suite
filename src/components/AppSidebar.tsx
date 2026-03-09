@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Requirements", url: "/requirements", icon: FileText },
   { title: "Generated Tests", url: "/generated-tests", icon: TestTubes },
   { title: "Synthetic Data", url: "/synthetic-data", icon: Database },
@@ -39,7 +40,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-border/50">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center glow-primary flex-shrink-0">
+          <div className="h-8 w-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
             <Zap className="h-4 w-4 text-primary" />
           </div>
           {!collapsed && (

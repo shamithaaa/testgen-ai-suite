@@ -40,7 +40,7 @@ const TestExecution = () => {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.08 }}
-              className="floating-card p-4"
+              className="stat-card"
             >
               <div className="flex items-center gap-2 mb-2">
                 <s.icon className={`h-4 w-4 ${s.color}`} />
@@ -77,7 +77,7 @@ const TestExecution = () => {
                     <Cell key={i} fill={COLORS[i]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ background: "hsl(225, 15%, 10%)", border: "1px solid hsl(225, 12%, 16%)", borderRadius: 8, color: "hsl(210, 20%, 92%)", fontSize: 12 }} />
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))", fontSize: 12 }} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex justify-center gap-4 text-xs">
@@ -126,7 +126,7 @@ const TestExecution = () => {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.04 }}
-                className="flex items-center justify-between px-4 py-3 hover:bg-muted/10 transition-colors"
+                className="flex items-center justify-between px-4 py-3 hover:bg-muted/20 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   {t.status === "PASS" ? (
