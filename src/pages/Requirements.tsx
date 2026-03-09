@@ -1,25 +1,29 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Send, Loader2, FileText } from "lucide-react";
+import { Sparkles, Send, Loader2, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useAnalyzeRequirement } from "@/hooks/use-requirements";
 
 const exampleRequirement = "Truck sends engine health data to fleet platform every 30 seconds. The data includes engine temperature, RPM, oil pressure, fuel level, GPS coordinates, and vehicle speed. The fleet platform processes and stores the data for real-time monitoring and historical analysis.";
 
 const Requirements = () => {
   const [requirement, setRequirement] = useState("");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const navigate = useNavigate();
+  const analyzeMutation = useAnalyzeRequirement();
 
-  const handleGenerate = () => {
+  const isAnalyzing = analyzeMutation.isPending;
+
+  const handleGenerate = async () => {
     if (!requirement.trim()) return;
-    setIsAnalyzing(true);
-    // Mock API call: POST /api/analyze-requirement
-    setTimeout(() => {
-      setIsAnalyzing(false);
+    try {
+      const result = await analyzeMutation.mutateAsync(requirement);
+      localStorage.setItem("lastRequirementId", result.id);
       navigate("/generated-tests");
-    }, 2500);
+    } catch {
+      // error shown via analyzeMutation.isError
+    }
   };
 
   return (
@@ -88,6 +92,12 @@ const Requirements = () => {
               </div>
               <h3 className="font-display font-semibold mb-2">AI is analyzing your requirement...</h3>
               <p className="text-sm text-muted-foreground">Generating test cases, identifying edge cases, and preparing synthetic data</p>
+              {analyzeMutation.isError && (
+                <div className="mt-4 flex items-center gap-2 text-destructive text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Failed to connect to backend. Is the server running on port 8000?</span>
+                </div>
+              )}
               <div className="mt-6 h-1 bg-muted rounded-full overflow-hidden max-w-xs mx-auto">
                 <motion.div
                   className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"

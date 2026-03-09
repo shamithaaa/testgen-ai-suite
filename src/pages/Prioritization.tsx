@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
-import { ArrowUpDown, AlertTriangle, AlertOctagon, Shield, Bug } from "lucide-react";
+import { ArrowUpDown, AlertTriangle, AlertOctagon, Shield, Bug, Loader2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { usePrioritizedTests, useRefreshPrioritization } from "@/hooks/use-prioritization";
 import { mockPrioritizedTests } from "@/lib/mockData";
 
 const statusConfig = {
@@ -10,10 +12,25 @@ const statusConfig = {
 };
 
 const Prioritization = () => {
-  const high = mockPrioritizedTests.filter((t) => t.priority >= 80);
-  const medium = mockPrioritizedTests.filter((t) => t.priority >= 40 && t.priority < 80);
-  const low = mockPrioritizedTests.filter((t) => t.priority < 40);
-  const knownFailures = mockPrioritizedTests.filter((t) => t.knownFailure);
+  const { data, isLoading, isError } = usePrioritizedTests();
+  const refreshMutation = useRefreshPrioritization();
+
+  // Fall back to mock data
+  const rawTests = data ?? (isError ? mockPrioritizedTests.map((t) => ({
+    id: t.id,
+    tc_id: t.id,
+    name: t.name,
+    failure_count: t.failureCount,
+    severity: t.severity,
+    priority: t.priority,
+    status: t.status as "failed" | "warning" | "stable",
+    known_failure: t.knownFailure,
+  })) : []);
+
+  const high = rawTests.filter((t) => t.priority >= 80);
+  const medium = rawTests.filter((t) => t.priority >= 40 && t.priority < 80);
+  const low = rawTests.filter((t) => t.priority < 40);
+  const knownFailures = rawTests.filter((t) => t.known_failure);
 
   const sections = [
     { label: "High Priority", icon: AlertOctagon, items: high, accent: "text-destructive", border: "border-l-destructive" },
@@ -25,8 +42,27 @@ const Prioritization = () => {
     <div className="max-w-5xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         <div className="mb-8">
-          <h1 className="text-3xl font-display font-bold mb-2">Test Prioritization</h1>
-          <p className="text-muted-foreground">AI-ranked test execution order based on failure history and risk</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-display font-bold mb-2">Test Prioritization</h1>
+              <p className="text-muted-foreground">
+                {isError ? "Showing cached mock data — backend unreachable" : "AI-ranked test execution order based on failure history and risk"}
+              </p>
+            </div>
+            <Button
+              onClick={() => refreshMutation.mutate()}
+              disabled={refreshMutation.isPending || isLoading}
+              variant="outline"
+              size="sm"
+              className="font-display"
+            >
+              {refreshMutation.isPending ? (
+                <><Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />Re-ranking…</>
+              ) : (
+                <><RefreshCw className="h-3.5 w-3.5 mr-2" />Refresh AI Ranking</>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Known Failures */}
@@ -47,19 +83,19 @@ const Prioritization = () => {
             <div className="divide-y divide-border/20">
               {knownFailures.map((t, i) => (
                 <motion.div
-                  key={t.id}
+                  key={t.tc_id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.2 + i * 0.05 }}
                   className="flex items-center justify-between px-4 py-3"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs text-muted-foreground w-16">{t.id}</span>
+                    <span className="font-mono text-xs text-muted-foreground w-16">{t.tc_id}</span>
                     <span className="text-sm">{t.name}</span>
                     <Badge className="bg-destructive/20 text-destructive text-[10px] border-none">Known Failure</Badge>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground">{t.failureCount} failures</span>
+                    <span className="text-xs text-muted-foreground">{t.failure_count} failures</span>
                     <span className="font-mono text-xs font-semibold text-destructive">{t.priority}</span>
                   </div>
                 </motion.div>
@@ -92,19 +128,19 @@ const Prioritization = () => {
                 <div className="divide-y divide-border/20">
                   {section.items.map((t, i) => (
                     <motion.div
-                      key={t.id}
+                      key={t.tc_id}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 + i * 0.05 }}
                       className={`flex items-center justify-between px-4 py-3 border-l-2 ${section.border} hover:bg-muted/10 transition-colors`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="font-mono text-xs text-muted-foreground w-16">{t.id}</span>
+                        <span className="font-mono text-xs text-muted-foreground w-16">{t.tc_id}</span>
                         <span className="text-sm">{t.name}</span>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <div className="text-xs text-muted-foreground">{t.failureCount} failures</div>
+                          <div className="text-xs text-muted-foreground">{t.failure_count} failures</div>
                           <div className="text-[10px] text-muted-foreground">{t.severity}</div>
                         </div>
                         <div className="w-10 text-center">

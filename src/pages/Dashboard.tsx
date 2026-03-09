@@ -7,18 +7,35 @@ import { Badge } from "@/components/ui/badge";
 import { mockTestResults, mockPrioritizedTests, mockTestCases, mockSyntheticData } from "@/lib/mockData";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, RadialBarChart, RadialBar
+  ResponsiveContainer, PieChart, Pie, Cell, RadialBarChart, RadialBar
 } from "recharts";
+import { useDashboardStats } from "@/hooks/use-dashboard";
+
+const CATEGORY_COLORS: Record<string, string> = {
+  functional: "hsl(174, 80%, 50%)",
+  edge: "hsl(260, 60%, 55%)",
+  api: "hsl(38, 90%, 55%)",
+  failure: "hsl(0, 72%, 55%)",
+  regression: "hsl(152, 60%, 45%)",
+};
 
 const Dashboard = () => {
-  const totalTests = Object.values(mockTestCases).flat().length;
-  const passed = mockTestResults.filter((t) => t.status === "PASS").length;
-  const failed = mockTestResults.filter((t) => t.status === "FAIL").length;
-  const successRate = Math.round((passed / mockTestResults.length) * 100);
-  const avgDuration = (mockTestResults.reduce((s, t) => s + t.duration, 0) / mockTestResults.length).toFixed(1);
-  const knownFailures = mockPrioritizedTests.filter((t) => t.knownFailure).length;
-  const highPriority = mockPrioritizedTests.filter((t) => t.priority >= 80).length;
-  const activeVehicles = mockSyntheticData.filter((d) => d.status === "Active").length;
+  const { data: stats, isError } = useDashboardStats();
+
+  // Fall back to mock-derived values when backend is unreachable
+  const mockPassed = mockTestResults.filter((t) => t.status === "PASS").length;
+  const mockFailed = mockTestResults.filter((t) => t.status === "FAIL").length;
+  const mockTotal = mockTestResults.length;
+  const mockTotalTests = Object.values(mockTestCases).flat().length;
+
+  const totalTests = stats?.total_tests ?? mockTotalTests;
+  const passed = stats?.latest_run.passed ?? mockPassed;
+  const failed = stats?.latest_run.failed ?? mockFailed;
+  const successRate = stats?.latest_run.success_rate ?? Math.round((mockPassed / mockTotal) * 100);
+  const avgDuration = (stats?.latest_run.avg_duration ?? (mockTestResults.reduce((s, t) => s + t.duration, 0) / mockTotal)).toFixed(1);
+  const knownFailures = stats?.known_failures ?? mockPrioritizedTests.filter((t) => t.knownFailure).length;
+  const highPriority = stats?.high_priority ?? mockPrioritizedTests.filter((t) => t.priority >= 80).length;
+  const activeVehicles = stats?.active_vehicles ?? mockSyntheticData.filter((d) => d.status === "Active").length;
 
   // KPI cards
   const kpis = [
@@ -30,25 +47,32 @@ const Dashboard = () => {
     { label: "High Priority", value: highPriority, icon: Target, change: "+1", up: true, color: "text-warning" },
   ];
 
-  // Weekly trend data
-  const weeklyTrend = [
+  // Weekly trend — use real data or fall back to static mock
+  const mockWeekly = [
     { day: "Mon", passed: 18, failed: 3, total: 21 },
     { day: "Tue", passed: 22, failed: 2, total: 24 },
     { day: "Wed", passed: 19, failed: 5, total: 24 },
     { day: "Thu", passed: 25, failed: 1, total: 26 },
     { day: "Fri", passed: 20, failed: 4, total: 24 },
     { day: "Sat", passed: 15, failed: 2, total: 17 },
-    { day: "Sun", passed: passed, failed: failed, total: mockTestResults.length },
+    { day: "Sun", passed: mockPassed, failed: mockFailed, total: mockTotal },
   ];
+  const weeklyTrend = stats?.weekly_trend?.length ? stats.weekly_trend : mockWeekly;
 
-  // Category distribution
-  const categoryData = [
-    { name: "Functional", value: mockTestCases.functional.length, fill: "hsl(174, 80%, 50%)" },
-    { name: "Edge Cases", value: mockTestCases.edge.length, fill: "hsl(260, 60%, 55%)" },
-    { name: "API", value: mockTestCases.api.length, fill: "hsl(38, 90%, 55%)" },
-    { name: "Failure", value: mockTestCases.failure.length, fill: "hsl(0, 72%, 55%)" },
-    { name: "Regression", value: mockTestCases.regression.length, fill: "hsl(152, 60%, 45%)" },
-  ];
+  // Category distribution — derived from real test_case_counts or mock
+  const mockCounts = {
+    functional: mockTestCases.functional.length,
+    edge: mockTestCases.edge.length,
+    api: mockTestCases.api.length,
+    failure: mockTestCases.failure.length,
+    regression: mockTestCases.regression.length,
+  };
+  const counts = stats?.test_case_counts ?? mockCounts;
+  const categoryData = Object.entries(counts).map(([name, value]) => ({
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    value,
+    fill: CATEGORY_COLORS[name] ?? "hsl(260, 60%, 55%)",
+  }));
 
   // Coverage data for radial chart
   const coverageData = [
@@ -67,7 +91,7 @@ const Dashboard = () => {
   ];
   const totalSeverity = severityBreakdown.reduce((s, b) => s + b.count, 0);
 
-  // Recent activity
+  // Recent activity from mock (no dedicated endpoint yet)
   const recentActivity = mockTestResults.slice(0, 5).map((t) => ({
     ...t,
     timeAgo: `${Math.floor(Math.random() * 30) + 1}m ago`,
@@ -84,7 +108,11 @@ const Dashboard = () => {
             </div>
             <div>
               <h1 className="text-3xl font-display font-bold">Dashboard</h1>
-              <p className="text-muted-foreground text-sm">Overview of your test intelligence platform</p>
+              <p className="text-muted-foreground text-sm">
+                {isError
+                  ? "Showing cached mock data — backend unreachable"
+                  : "Live overview of your test intelligence platform"}
+              </p>
             </div>
           </div>
         </div>
@@ -274,7 +302,7 @@ const Dashboard = () => {
           </div>
           <div className="floating-card p-5 text-center">
             <BarChart3 className="h-5 w-5 text-secondary mx-auto mb-2" />
-            <span className="text-3xl font-display font-bold text-gradient block">{mockSyntheticData.length}</span>
+            <span className="text-3xl font-display font-bold text-gradient block">{stats ? Object.values(stats.test_case_counts).reduce((a, b) => a + b, 0) : mockSyntheticData.length}</span>
             <span className="text-xs text-muted-foreground">Data Records</span>
           </div>
           <div className="floating-card p-5 text-center">

@@ -1,16 +1,11 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Database, Thermometer, Gauge, MapPin, Fuel } from "lucide-react";
+import { Database, Thermometer, Gauge, MapPin, Fuel, Loader2, RefreshCw } from "lucide-react";
+import { useSyntheticData, useGenerateSyntheticData } from "@/hooks/use-synthetic-data";
 import { mockSyntheticData } from "@/lib/mockData";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
-
-const chartData = mockSyntheticData.slice(0, 12).map((d) => ({
-  name: d.vehicleId.slice(-4),
-  temp: d.engineTemp,
-  rpm: d.rpm,
-  speed: d.speed,
-  fuel: d.fuelLevel,
-}));
 
 const statusColors: Record<string, string> = {
   Active: "bg-success/15 text-success border-success/20",
@@ -19,10 +14,37 @@ const statusColors: Record<string, string> = {
 };
 
 const SyntheticData = () => {
-  const avgTemp = Math.round(mockSyntheticData.reduce((s, d) => s + d.engineTemp, 0) / mockSyntheticData.length);
-  const avgRpm = Math.round(mockSyntheticData.reduce((s, d) => s + d.rpm, 0) / mockSyntheticData.length);
-  const avgFuel = Math.round(mockSyntheticData.reduce((s, d) => s + d.fuelLevel, 0) / mockSyntheticData.length);
-  const activeCount = mockSyntheticData.filter((d) => d.status === "Active").length;
+  const [scenario, setScenario] = useState("");
+  const { data, isLoading, isError } = useSyntheticData(50);
+  const generateMutation = useGenerateSyntheticData();
+
+  const displayData = data ?? (isError ? mockSyntheticData.map((d) => ({
+    id: d.vehicleId,
+    vehicle_id: d.vehicleId,
+    lat: parseFloat(d.lat),
+    lng: parseFloat(d.lng),
+    engine_temp: d.engineTemp,
+    rpm: d.rpm,
+    fuel_level: d.fuelLevel,
+    oil_pressure: d.oilPressure,
+    speed: d.speed,
+    trip_id: d.tripId,
+    status: d.status as "Active" | "Idle" | "Maintenance",
+    timestamp: d.timestamp,
+  })) : []);
+
+  const avgTemp = displayData.length ? Math.round(displayData.reduce((s, d) => s + d.engine_temp, 0) / displayData.length) : 0;
+  const avgRpm = displayData.length ? Math.round(displayData.reduce((s, d) => s + d.rpm, 0) / displayData.length) : 0;
+  const avgFuel = displayData.length ? Math.round(displayData.reduce((s, d) => s + d.fuel_level, 0) / displayData.length) : 0;
+  const activeCount = displayData.filter((d) => d.status === "Active").length;
+
+  const chartData = displayData.slice(0, 12).map((d) => ({
+    name: d.vehicle_id.slice(-4),
+    temp: d.engine_temp,
+    rpm: d.rpm,
+    speed: d.speed,
+    fuel: d.fuel_level,
+  }));
 
   const stats = [
     { label: "Avg Engine Temp", value: `${avgTemp}°F`, icon: Thermometer, color: "text-destructive" },
@@ -34,9 +56,32 @@ const SyntheticData = () => {
   return (
     <div className="max-w-7xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <div className="mb-8">
-          <h1 className="text-3xl font-display font-bold mb-2">Synthetic Test Data</h1>
-          <p className="text-muted-foreground">AI-generated vehicle telemetry data for testing</p>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-display font-bold mb-2">Synthetic Test Data</h1>
+            <p className="text-muted-foreground">
+              {isError ? "Showing cached mock data — backend unreachable" : "AI-generated vehicle telemetry data for testing"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              className="text-xs font-mono bg-muted/30 border border-border/50 rounded-lg px-3 py-2 w-48 placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50"
+              placeholder="Scenario (optional)…"
+              value={scenario}
+              onChange={(e) => setScenario(e.target.value)}
+            />
+            <Button
+              onClick={() => generateMutation.mutate({ count: 20, scenario: scenario || undefined })}
+              disabled={generateMutation.isPending}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-display glow-primary"
+            >
+              {generateMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
+              ) : (
+                <><RefreshCw className="h-4 w-4 mr-2" />Generate Data</>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -101,7 +146,10 @@ const SyntheticData = () => {
           <div className="p-4 border-b border-border/30 flex items-center gap-2">
             <Database className="h-4 w-4 text-primary" />
             <span className="font-display font-semibold text-sm">Vehicle Telemetry Table</span>
-            <Badge variant="secondary" className="bg-muted text-muted-foreground text-xs ml-2">{mockSyntheticData.length} records</Badge>
+            <Badge variant="secondary" className="bg-muted text-muted-foreground text-xs ml-2">
+              {displayData.length} records
+            </Badge>
+            {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground ml-2" />}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -113,24 +161,24 @@ const SyntheticData = () => {
                 </tr>
               </thead>
               <tbody>
-                {mockSyntheticData.map((d, i) => (
+                {displayData.map((d, i) => (
                   <motion.tr
-                    key={d.vehicleId}
+                    key={d.vehicle_id + i}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: i * 0.03 }}
+                    transition={{ delay: i * 0.02 }}
                     className="border-b border-border/20 hover:bg-muted/20 transition-colors"
                   >
-                    <td className="px-4 py-3 font-mono font-medium text-primary">{d.vehicleId}</td>
-                    <td className="px-4 py-3 font-mono text-muted-foreground">{d.lat}, {d.lng}</td>
+                    <td className="px-4 py-3 font-mono font-medium text-primary">{d.vehicle_id}</td>
+                    <td className="px-4 py-3 font-mono text-muted-foreground">{d.lat.toFixed(4)}, {d.lng.toFixed(4)}</td>
                     <td className="px-4 py-3">
-                      <span className={d.engineTemp > 220 ? "text-destructive" : "text-foreground"}>{d.engineTemp}°F</span>
+                      <span className={d.engine_temp > 220 ? "text-destructive" : "text-foreground"}>{d.engine_temp.toFixed(1)}°F</span>
                     </td>
                     <td className="px-4 py-3 font-mono">{d.rpm}</td>
-                    <td className="px-4 py-3">{d.fuelLevel}%</td>
-                    <td className="px-4 py-3">{d.speed} mph</td>
-                    <td className="px-4 py-3">{d.oilPressure} PSI</td>
-                    <td className="px-4 py-3 font-mono text-muted-foreground">{d.tripId}</td>
+                    <td className="px-4 py-3">{d.fuel_level.toFixed(1)}%</td>
+                    <td className="px-4 py-3">{d.speed.toFixed(1)} mph</td>
+                    <td className="px-4 py-3">{d.oil_pressure.toFixed(1)} PSI</td>
+                    <td className="px-4 py-3 font-mono text-muted-foreground">{d.trip_id}</td>
                     <td className="px-4 py-3">
                       <Badge variant="outline" className={`text-[10px] ${statusColors[d.status]}`}>{d.status}</Badge>
                     </td>
