@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Zap, ChevronDown, User } from "lucide-react";
 
 const DashboardLayout = () => {
@@ -20,7 +21,8 @@ const DashboardLayout = () => {
                 <span className="font-display font-semibold text-sm">TestGen AI</span>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
               <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-muted/50">
                 <span>Workspace</span>
                 <ChevronDown className="h-3.5 w-3.5" />

@@ -4,7 +4,7 @@ import { mockSyntheticData } from "@/lib/mockData";
 import { Badge } from "@/components/ui/badge";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
-const chartData = mockSyntheticData.slice(0, 12).map((d, i) => ({
+const chartData = mockSyntheticData.slice(0, 12).map((d) => ({
   name: d.vehicleId.slice(-4),
   temp: d.engineTemp,
   rpm: d.rpm,
@@ -47,7 +47,7 @@ const SyntheticData = () => {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.08 }}
-              className="floating-card p-4"
+              className="stat-card"
             >
               <div className="flex items-center gap-2 mb-2">
                 <s.icon className={`h-4 w-4 ${s.color}`} />
@@ -72,10 +72,10 @@ const SyntheticData = () => {
                     <stop offset="95%" stopColor="hsl(174, 80%, 50%)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(225, 12%, 16%)" />
-                <XAxis dataKey="name" tick={{ fill: "hsl(215, 15%, 55%)", fontSize: 11 }} />
-                <YAxis tick={{ fill: "hsl(215, 15%, 55%)", fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: "hsl(225, 15%, 10%)", border: "1px solid hsl(225, 12%, 16%)", borderRadius: 8, color: "hsl(210, 20%, 92%)", fontSize: 12 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))", fontSize: 12 }} />
                 <Area type="monotone" dataKey="temp" stroke="hsl(174, 80%, 50%)" fill="url(#tempGrad)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
@@ -86,10 +86,10 @@ const SyntheticData = () => {
             </h3>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(225, 12%, 16%)" />
-                <XAxis dataKey="name" tick={{ fill: "hsl(215, 15%, 55%)", fontSize: 11 }} />
-                <YAxis tick={{ fill: "hsl(215, 15%, 55%)", fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: "hsl(225, 15%, 10%)", border: "1px solid hsl(225, 12%, 16%)", borderRadius: 8, color: "hsl(210, 20%, 92%)", fontSize: 12 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))", fontSize: 12 }} />
                 <Bar dataKey="rpm" fill="hsl(260, 60%, 55%)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -106,7 +106,7 @@ const SyntheticData = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-border/30 bg-muted/20">
+                <tr className="border-b border-border/30 bg-muted/30">
                   {["Vehicle", "GPS", "Temp", "RPM", "Fuel", "Speed", "Oil PSI", "Trip", "Status", "Timestamp"].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-display font-medium text-muted-foreground">{h}</th>
                   ))}
@@ -119,7 +119,7 @@ const SyntheticData = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: i * 0.03 }}
-                    className="border-b border-border/20 hover:bg-muted/10 transition-colors"
+                    className="border-b border-border/20 hover:bg-muted/20 transition-colors"
                   >
                     <td className="px-4 py-3 font-mono font-medium text-primary">{d.vehicleId}</td>
                     <td className="px-4 py-3 font-mono text-muted-foreground">{d.lat}, {d.lng}</td>

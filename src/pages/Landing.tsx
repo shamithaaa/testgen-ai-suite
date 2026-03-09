@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Zap, ArrowRight, TestTubes, Brain, BarChart3, Shield } from "lucide-react";
+import { Zap, ArrowRight, TestTubes, Brain, BarChart3, Shield, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/hooks/use-theme";
 
 const features = [
   { icon: Brain, title: "AI-Powered Analysis", desc: "Transform requirements into comprehensive test suites automatically" },
@@ -12,24 +13,35 @@ const features = [
 
 const Landing = () => {
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="min-h-screen bg-gradient-hero overflow-hidden">
       {/* Nav */}
       <nav className="flex items-center justify-between px-8 py-5 relative z-10">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center glow-primary">
+          <div className="h-9 w-9 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
             <Zap className="h-5 w-5 text-primary" />
           </div>
           <span className="font-display font-bold text-lg">TestGen AI</span>
         </div>
-        <Button
-          variant="outline"
-          className="border-border/50 text-foreground hover:bg-muted/50"
-          onClick={() => navigate("/requirements")}
-        >
-          Dashboard
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="outline"
+            className="border-border/50 text-foreground hover:bg-muted/50"
+            onClick={() => navigate("/dashboard")}
+          >
+            Dashboard
+          </Button>
+        </div>
       </nav>
 
       {/* Hero */}
@@ -64,7 +76,7 @@ const Landing = () => {
           <div className="flex items-center gap-4 justify-center">
             <Button
               size="lg"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 glow-primary-strong font-display font-semibold px-8 h-12 text-base"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-display font-semibold px-8 h-12 text-base"
               onClick={() => navigate("/requirements")}
             >
               Generate Tests
@@ -74,7 +86,7 @@ const Landing = () => {
               size="lg"
               variant="outline"
               className="border-border/50 text-foreground hover:bg-muted/50 font-display h-12 px-8 text-base"
-              onClick={() => navigate("/test-execution")}
+              onClick={() => navigate("/dashboard")}
             >
               View Dashboard
             </Button>
