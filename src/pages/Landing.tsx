@@ -70,16 +70,16 @@ const Landing = () => {
           </h1>
 
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-            Transform software requirements into comprehensive test suites, synthetic data, and prioritized execution plans — all powered by AI.
+            Paste a requirement → AI generates tests → run them → get a priority ranking. Four steps, no setup needed.
           </p>
 
-          <div className="flex items-center gap-4 justify-center">
+          <div className="flex items-center gap-4 justify-center mb-10">
             <Button
               size="lg"
               className="bg-primary text-primary-foreground hover:bg-primary/90 font-display font-semibold px-8 h-12 text-base"
               onClick={() => navigate("/requirements")}
             >
-              Generate Tests
+              Start — Step 1: Enter Requirement
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             <Button
@@ -90,6 +90,16 @@ const Landing = () => {
             >
               View Dashboard
             </Button>
+          </div>
+
+          {/* 4-step flow strip */}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap justify-center">
+            {["1. Enter Requirement", "2. Review Test Cases", "3. Run Tests", "4. Prioritize Results"].map((step, i, arr) => (
+              <>
+                <span key={step} className="px-3 py-1 rounded-full border border-border/40 bg-muted/20">{step}</span>
+                {i < arr.length - 1 && <ArrowRight key={`arrow-${i}`} className="h-3 w-3 text-muted-foreground/40" />}
+              </>
+            ))}
           </div>
         </motion.div>
 

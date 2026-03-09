@@ -41,11 +41,23 @@ const Prioritization = () => {
   return (
     <div className="max-w-5xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <div className="mb-8">
+        {/* Step banner */}
+        <div className="flex items-center gap-3 mb-6 p-4 rounded-xl border border-warning/20 bg-warning/5">
+          <div className="h-9 w-9 rounded-lg bg-warning/20 border border-warning/30 flex items-center justify-center shrink-0 font-display font-bold text-warning text-sm">4</div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="font-display font-semibold text-sm">Step 4 of 4 — View Priority Ranking</span>
+              <Badge variant="outline" className="text-[10px] border-warning/30 text-warning bg-warning/10">Final Step</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">AI ranks all tests by risk and failure history. Focus on "High Priority" tests first — these are the ones most likely to uncover real issues. "Refresh AI Ranking" re-runs the analysis with latest data.</p>
+          </div>
+        </div>
+
+        <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-display font-bold mb-2">Test Prioritization</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl font-display font-bold mb-1">Test Prioritization</h1>
+              <p className="text-muted-foreground text-sm">
                 {isError ? "Showing cached mock data — backend unreachable" : "AI-ranked test execution order based on failure history and risk"}
               </p>
             </div>

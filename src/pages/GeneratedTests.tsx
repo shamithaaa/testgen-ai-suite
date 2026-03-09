@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronRight, TestTubes, AlertTriangle, Globe, XCircle, RotateCcw, Loader2, ServerCrash } from "lucide-react";
+import { ChevronDown, ChevronRight, TestTubes, AlertTriangle, Globe, XCircle, RotateCcw, Loader2, ServerCrash, ArrowRight, Play } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useGroupedTestCases } from "@/hooks/use-test-cases";
 import { mockTestCases } from "@/lib/mockData";
 
@@ -21,6 +23,7 @@ const severityColors: Record<string, string> = {
 };
 
 const GeneratedTests = () => {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ functional: true });
   const requirementId = localStorage.getItem("lastRequirementId") ?? undefined;
 
@@ -44,10 +47,31 @@ const GeneratedTests = () => {
   return (
     <div className="max-w-5xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <div className="flex items-center justify-between mb-8">
+{/* Step banner */}
+        <div className="flex items-center gap-3 mb-6 p-4 rounded-xl border border-secondary/20 bg-secondary/5">
+          <div className="h-9 w-9 rounded-lg bg-secondary/20 border border-secondary/30 flex items-center justify-center shrink-0 font-display font-bold text-secondary text-sm">2</div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="font-display font-semibold text-sm">Step 2 of 4 — Review Generated Tests</span>
+              <Badge variant="outline" className="text-[10px] border-secondary/30 text-secondary bg-secondary/10">{total} tests ready</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">Browse the AI-generated test cases grouped by category. When you're ready, move on to Step 3 to actually run them.</p>
+          </div>
+          <Button
+            size="sm"
+            className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 font-display gap-1.5"
+            onClick={() => navigate("/test-execution")}
+          >
+            <Play className="h-3.5 w-3.5" />
+            Run Tests
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-display font-bold mb-2">Generated Test Cases</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl font-display font-bold mb-1">Generated Test Cases</h1>
+            <p className="text-muted-foreground text-sm">
               {isError
                 ? "Showing cached mock data — backend unreachable"
                 : "AI-generated test suite based on your requirements"}

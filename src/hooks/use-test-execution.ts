@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
@@ -20,7 +19,8 @@ export function useRunSummary(runId: string | undefined) {
 export function useRunTests() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (requirementId?: string) => api.runTests(requirementId),
+    mutationFn: (payload: Parameters<typeof api.runTests>[0]) =>
+      api.runTests(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["test-results"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });

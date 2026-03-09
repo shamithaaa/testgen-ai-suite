@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Send, Loader2, FileText, AlertCircle } from "lucide-react";
+import { Sparkles, Send, Loader2, FileText, AlertCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useAnalyzeRequirement } from "@/hooks/use-requirements";
 
@@ -29,9 +30,26 @@ const Requirements = () => {
   return (
     <div className="max-w-4xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <div className="mb-8">
-          <h1 className="text-3xl font-display font-bold mb-2">Requirement Analysis</h1>
-          <p className="text-muted-foreground">Paste your software requirement and let AI generate comprehensive test cases.</p>
+        {/* Step banner */}
+        <div className="flex items-center gap-3 mb-6 p-4 rounded-xl border border-primary/20 bg-primary/5">
+          <div className="h-9 w-9 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 font-display font-bold text-primary text-sm">1</div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="font-display font-semibold text-sm">Step 1 of 4 — Enter Your Requirement</span>
+              <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/10">Start Here</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">Describe what your software does in plain English. The AI will automatically generate a full set of test cases covering functional, edge, API, failure, and regression scenarios.</p>
+          </div>
+          <div className="hidden sm:flex items-center gap-1 text-muted-foreground/40 text-xs shrink-0">
+            <span>→ Step 2: Review Tests</span>
+            <span>→ Step 3: Run</span>
+            <span>→ Step 4: Prioritize</span>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <h1 className="text-2xl font-display font-bold mb-1">Requirement Analysis</h1>
+          <p className="text-muted-foreground text-sm">Paste your requirement below — AI will generate comprehensive test cases automatically.</p>
         </div>
 
         <div className="floating-card p-6">
@@ -94,8 +112,12 @@ const Requirements = () => {
               <p className="text-sm text-muted-foreground">Generating test cases, identifying edge cases, and preparing synthetic data</p>
               {analyzeMutation.isError && (
                 <div className="mt-4 flex items-center gap-2 text-destructive text-sm">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Failed to connect to backend. Is the server running on port 8000?</span>
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>
+                    {(analyzeMutation.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+                      ?? (analyzeMutation.error as Error)?.message
+                      ?? "Failed to connect to backend. Is the server running on port 8000?"}
+                  </span>
                 </div>
               )}
               <div className="mt-6 h-1 bg-muted rounded-full overflow-hidden max-w-xs mx-auto">

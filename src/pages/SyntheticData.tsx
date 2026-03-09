@@ -1,194 +1,268 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { motion } from "framer-motion";
-import { Database, Thermometer, Gauge, MapPin, Fuel, Loader2, RefreshCw } from "lucide-react";
-import { useSyntheticData, useGenerateSyntheticData } from "@/hooks/use-synthetic-data";
-import { mockSyntheticData } from "@/lib/mockData";
+import {
+  Database, Sparkles, Loader2, ChevronDown, Table2,
+  Info, Hash, Type, ToggleLeft, Clock, RefreshCw,
+} from "lucide-react";
+import { useSyntheticDatasets, useGenerateSyntheticData } from "@/hooks/use-synthetic-data";
+import { useRequirements } from "@/hooks/use-requirements";
+import { type SyntheticDataset } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
-const statusColors: Record<string, string> = {
-  Active: "bg-success/15 text-success border-success/20",
-  Idle: "bg-warning/15 text-warning border-warning/20",
-  Maintenance: "bg-destructive/15 text-destructive border-destructive/20",
+// â”€â”€ tiny helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+const typeIcon: Record<string, React.ReactNode> = {
+  string:   <Type className="h-3 w-3" />,
+  integer:  <Hash className="h-3 w-3" />,
+  float:    <Hash className="h-3 w-3" />,
+  boolean:  <ToggleLeft className="h-3 w-3" />,
+  datetime: <Clock className="h-3 w-3" />,
 };
 
+const typeColor: Record<string, string> = {
+  string:   "bg-primary/10 text-primary border-primary/20",
+  integer:  "bg-secondary/10 text-secondary border-secondary/20",
+  float:    "bg-secondary/10 text-secondary border-secondary/20",
+  boolean:  "bg-success/10 text-success border-success/20",
+  datetime: "bg-warning/10 text-warning border-warning/20",
+};
+
+function formatCell(value: unknown, type: string): string {
+  if (value === null || value === undefined) return "â€”";
+  if (type === "boolean") return value ? "true" : "false";
+  if (type === "float" && typeof value === "number") return value.toFixed(2);
+  if (type === "datetime" && typeof value === "string") {
+    try { return new Date(value).toLocaleString(); } catch { return String(value); }
+  }
+  return String(value);
+}
+
+// â”€â”€ main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 const SyntheticData = () => {
-  const [scenario, setScenario] = useState("");
-  const { data, isLoading, isError } = useSyntheticData(50);
+  const [selectedReqId, setSelectedReqId] = useState("");
+  const [count, setCount] = useState(20);
+  const [activeDataset, setActiveDataset] = useState<SyntheticDataset | null>(null);
+
+  const { data: requirements = [], isLoading: reqLoading } = useRequirements();
+  const { data: datasets = [], isLoading: dsLoading } = useSyntheticDatasets(10);
   const generateMutation = useGenerateSyntheticData();
 
-  const displayData = data ?? (isError ? mockSyntheticData.map((d) => ({
-    id: d.vehicleId,
-    vehicle_id: d.vehicleId,
-    lat: parseFloat(d.lat),
-    lng: parseFloat(d.lng),
-    engine_temp: d.engineTemp,
-    rpm: d.rpm,
-    fuel_level: d.fuelLevel,
-    oil_pressure: d.oilPressure,
-    speed: d.speed,
-    trip_id: d.tripId,
-    status: d.status as "Active" | "Idle" | "Maintenance",
-    timestamp: d.timestamp,
-  })) : []);
+  const handleGenerate = () => {
+    if (!selectedReqId) return;
+    generateMutation.mutate(
+      { requirement_id: selectedReqId, count },
+      {
+        onSuccess: (newDataset) => {
+          setActiveDataset(newDataset);
+        },
+      }
+    );
+  };
 
-  const avgTemp = displayData.length ? Math.round(displayData.reduce((s, d) => s + d.engine_temp, 0) / displayData.length) : 0;
-  const avgRpm = displayData.length ? Math.round(displayData.reduce((s, d) => s + d.rpm, 0) / displayData.length) : 0;
-  const avgFuel = displayData.length ? Math.round(displayData.reduce((s, d) => s + d.fuel_level, 0) / displayData.length) : 0;
-  const activeCount = displayData.filter((d) => d.status === "Active").length;
-
-  const chartData = displayData.slice(0, 12).map((d) => ({
-    name: d.vehicle_id.slice(-4),
-    temp: d.engine_temp,
-    rpm: d.rpm,
-    speed: d.speed,
-    fuel: d.fuel_level,
-  }));
-
-  const stats = [
-    { label: "Avg Engine Temp", value: `${avgTemp}°F`, icon: Thermometer, color: "text-destructive" },
-    { label: "Avg RPM", value: avgRpm.toLocaleString(), icon: Gauge, color: "text-primary" },
-    { label: "Avg Fuel Level", value: `${avgFuel}%`, icon: Fuel, color: "text-warning" },
-    { label: "Active Vehicles", value: activeCount, icon: MapPin, color: "text-success" },
-  ];
+  const displayDataset = activeDataset ?? (datasets.length > 0 ? datasets[0] : null);
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-display font-bold mb-2">Synthetic Test Data</h1>
-            <p className="text-muted-foreground">
-              {isError ? "Showing cached mock data — backend unreachable" : "AI-generated vehicle telemetry data for testing"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              className="text-xs font-mono bg-muted/30 border border-border/50 rounded-lg px-3 py-2 w-48 placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50"
-              placeholder="Scenario (optional)…"
-              value={scenario}
-              onChange={(e) => setScenario(e.target.value)}
-            />
+        {/* â”€â”€ Header â”€â”€ */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-display font-bold mb-2">Synthetic Test Data</h1>
+          <p className="text-muted-foreground">
+            Gemini reads your requirement and designs the schema + data rows â€” no templates, no hardcoded fields.
+          </p>
+        </div>
+
+        {/* â”€â”€ Generate panel â”€â”€ */}
+        <div className="floating-card p-6 mb-6">
+          <h2 className="font-display font-semibold text-sm mb-4 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Generate Data from Requirement
+          </h2>
+
+          <div className="flex flex-wrap gap-3 items-end">
+            {/* Requirement selector */}
+            <div className="flex-1 min-w-[260px]">
+              <label className="block text-xs text-muted-foreground mb-1.5">Requirement</label>
+              <div className="relative">
+                <select
+                  value={selectedReqId}
+                  onChange={(e) => setSelectedReqId(e.target.value)}
+                  className="w-full text-sm bg-muted/30 border border-border/50 rounded-lg px-3 py-2 pr-8 appearance-none focus:outline-none focus:border-primary/50 text-foreground"
+                >
+                  <option value="">
+                    {reqLoading ? "Loading requirementsâ€¦" : "â€” pick a requirement â€”"}
+                  </option>
+                  {requirements.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.text.slice(0, 90)}{r.text.length > 90 ? "â€¦" : ""}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Row count */}
+            <div className="w-28">
+              <label className="block text-xs text-muted-foreground mb-1.5">Rows</label>
+              <input
+                type="number"
+                min={5}
+                max={100}
+                value={count}
+                onChange={(e) => setCount(Math.min(100, Math.max(5, Number(e.target.value))))}
+                className="w-full text-sm bg-muted/30 border border-border/50 rounded-lg px-3 py-2 focus:outline-none focus:border-primary/50 text-foreground font-mono"
+              />
+            </div>
+
+            {/* Generate button */}
             <Button
-              onClick={() => generateMutation.mutate({ count: 20, scenario: scenario || undefined })}
-              disabled={generateMutation.isPending}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 font-display glow-primary"
+              onClick={handleGenerate}
+              disabled={!selectedReqId || generateMutation.isPending}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-display glow-primary h-[38px]"
             >
               {generateMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Asking Geminiâ€¦</>
               ) : (
-                <><RefreshCw className="h-4 w-4 mr-2" />Generate Data</>
+                <><Sparkles className="h-4 w-4 mr-2" />Generate</>
               )}
             </Button>
           </div>
+
+          {generateMutation.isError && (
+            <p className="text-destructive text-xs mt-3">
+              {(generateMutation.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+                ?? (generateMutation.error as Error)?.message
+                ?? "Generation failed — check backend logs."}
+            </p>
+          )}
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {stats.map((s, i) => (
-            <motion.div
-              key={s.label}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08 }}
-              className="stat-card"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <s.icon className={`h-4 w-4 ${s.color}`} />
-                <span className="text-xs text-muted-foreground">{s.label}</span>
-              </div>
-              <span className="text-2xl font-display font-bold">{s.value}</span>
-            </motion.div>
-          ))}
-        </div>
+        {/* â”€â”€ Past datasets switcher â”€â”€ */}
+        {datasets.length > 0 && (
+          <div className="flex gap-2 flex-wrap mb-4">
+            {datasets.map((ds, i) => (
+              <button
+                key={ds.id}
+                onClick={() => setActiveDataset(ds)}
+                className={`text-xs px-3 py-1.5 rounded-lg border font-mono transition-colors ${
+                  (displayDataset?.id === ds.id)
+                    ? "bg-primary/15 border-primary/40 text-primary"
+                    : "border-border/40 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                }`}
+              >
+                #{i + 1} Â· {ds.requirement_text.slice(0, 40)}{ds.requirement_text.length > 40 ? "â€¦" : ""} Â· {ds.count} rows
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Charts */}
-        <div className="grid lg:grid-cols-2 gap-4 mb-6">
-          <div className="floating-card p-5">
-            <h3 className="font-display font-semibold text-sm mb-4 flex items-center gap-2">
-              <Thermometer className="h-4 w-4 text-primary" /> Engine Temperature
-            </h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="tempGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(174, 80%, 50%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(174, 80%, 50%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))", fontSize: 12 }} />
-                <Area type="monotone" dataKey="temp" stroke="hsl(174, 80%, 50%)" fill="url(#tempGrad)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
+        {/* â”€â”€ Dataset view â”€â”€ */}
+        {dsLoading && (
+          <div className="floating-card p-10 flex items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-          <div className="floating-card p-5">
-            <h3 className="font-display font-semibold text-sm mb-4 flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-secondary" /> RPM Distribution
-            </h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))", fontSize: 12 }} />
-                <Bar dataKey="rpm" fill="hsl(260, 60%, 55%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        )}
 
-        {/* Table */}
-        <div className="floating-card overflow-hidden">
-          <div className="p-4 border-b border-border/30 flex items-center gap-2">
-            <Database className="h-4 w-4 text-primary" />
-            <span className="font-display font-semibold text-sm">Vehicle Telemetry Table</span>
-            <Badge variant="secondary" className="bg-muted text-muted-foreground text-xs ml-2">
-              {displayData.length} records
-            </Badge>
-            {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground ml-2" />}
+        {!dsLoading && !displayDataset && !generateMutation.isPending && (
+          <div className="floating-card p-10 text-center text-muted-foreground text-sm">
+            <Database className="h-8 w-8 mx-auto mb-3 opacity-30" />
+            No datasets yet â€” pick a requirement above and click Generate.
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border/30 bg-muted/30">
-                  {["Vehicle", "GPS", "Temp", "RPM", "Fuel", "Speed", "Oil PSI", "Trip", "Status", "Timestamp"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left font-display font-medium text-muted-foreground">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {displayData.map((d, i) => (
-                  <motion.tr
-                    key={d.vehicle_id + i}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: i * 0.02 }}
-                    className="border-b border-border/20 hover:bg-muted/20 transition-colors"
+        )}
+
+        {generateMutation.isPending && (
+          <div className="floating-card p-10 text-center text-muted-foreground text-sm">
+            <Sparkles className="h-8 w-8 mx-auto mb-3 animate-pulse text-primary" />
+            <p className="font-display font-semibold">Gemini is designing your schema and filling the rowsâ€¦</p>
+            <p className="text-xs mt-1 opacity-60">This usually takes 5â€“15 seconds.</p>
+          </div>
+        )}
+
+        {displayDataset && !generateMutation.isPending && (
+          <motion.div
+            key={displayDataset.id}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="space-y-4"
+          >
+            {/* Schema chips */}
+            <div className="floating-card p-5">
+              <h3 className="font-display font-semibold text-sm mb-3 flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary" />
+                AI-Designed Schema
+                <Badge variant="secondary" className="ml-auto text-xs">
+                  {displayDataset.schema_fields.length} fields
+                </Badge>
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {displayDataset.schema_fields.map((f) => (
+                  <div
+                    key={f.name}
+                    className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-mono ${typeColor[f.type] ?? "bg-muted text-muted-foreground border-border/30"}`}
+                    title={f.description}
                   >
-                    <td className="px-4 py-3 font-mono font-medium text-primary">{d.vehicle_id}</td>
-                    <td className="px-4 py-3 font-mono text-muted-foreground">{d.lat.toFixed(4)}, {d.lng.toFixed(4)}</td>
-                    <td className="px-4 py-3">
-                      <span className={d.engine_temp > 220 ? "text-destructive" : "text-foreground"}>{d.engine_temp.toFixed(1)}°F</span>
-                    </td>
-                    <td className="px-4 py-3 font-mono">{d.rpm}</td>
-                    <td className="px-4 py-3">{d.fuel_level.toFixed(1)}%</td>
-                    <td className="px-4 py-3">{d.speed.toFixed(1)} mph</td>
-                    <td className="px-4 py-3">{d.oil_pressure.toFixed(1)} PSI</td>
-                    <td className="px-4 py-3 font-mono text-muted-foreground">{d.trip_id}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant="outline" className={`text-[10px] ${statusColors[d.status]}`}>{d.status}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{new Date(d.timestamp).toLocaleTimeString()}</td>
-                  </motion.tr>
+                    {typeIcon[f.type]}
+                    {f.name}
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              </div>
+            </div>
+
+            {/* Data table */}
+            <div className="floating-card overflow-hidden">
+              <div className="p-4 border-b border-border/30 flex items-center gap-2">
+                <Table2 className="h-4 w-4 text-primary" />
+                <span className="font-display font-semibold text-sm">Data Table</span>
+                <Badge variant="secondary" className="bg-muted text-muted-foreground text-xs ml-2">
+                  {displayDataset.rows.length} rows
+                </Badge>
+                <span className="ml-auto text-xs text-muted-foreground font-mono opacity-60">
+                  {new Date(displayDataset.generated_at).toLocaleString()}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border/30 bg-muted/30">
+                      <th className="px-4 py-3 text-left font-display font-medium text-muted-foreground w-12">#</th>
+                      {displayDataset.schema_fields.map((f) => (
+                        <th key={f.name} className="px-4 py-3 text-left font-display font-medium text-muted-foreground whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            <span className="opacity-60">{typeIcon[f.type]}</span>
+                            {f.name}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayDataset.rows.map((row, i) => (
+                      <motion.tr
+                        key={i}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: i * 0.015 }}
+                        className="border-b border-border/20 hover:bg-muted/20 transition-colors"
+                      >
+                        <td className="px-4 py-3 font-mono text-muted-foreground/50">{i + 1}</td>
+                        {displayDataset.schema_fields.map((f) => (
+                          <td key={f.name} className="px-4 py-3 font-mono">
+                            {formatCell(row[f.name], f.type)}
+                          </td>
+                        ))}
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </motion.div>
     </div>
   );

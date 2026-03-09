@@ -31,6 +31,12 @@ class TestResultOut(BaseModel):
     timestamp: datetime
 
 
+class RunStarted(BaseModel):
+    """Returned immediately by POST /run — execution continues in the background."""
+    run_id: str
+    total: int
+
+
 class RunSummary(BaseModel):
     run_id: str
     total: int

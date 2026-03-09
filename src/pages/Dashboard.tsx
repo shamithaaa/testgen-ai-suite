@@ -1,9 +1,12 @@
 import { motion } from "framer-motion";
 import {
   TestTubes, CheckCircle2, XCircle, TrendingUp, AlertTriangle,
-  Clock, Zap, BarChart3, Activity, Target, Layers, ArrowUpRight, ArrowDownRight
+  Clock, Zap, BarChart3, Activity, Target, Layers, ArrowUpRight, ArrowDownRight,
+  FileText, Play, ArrowUpDown, ArrowRight
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { mockTestResults, mockPrioritizedTests, mockTestCases, mockSyntheticData } from "@/lib/mockData";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -20,6 +23,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { data: stats, isError } = useDashboardStats();
 
   // Fall back to mock-derived values when backend is unreachable
@@ -114,6 +118,66 @@ const Dashboard = () => {
                   : "Live overview of your test intelligence platform"}
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* How It Works — beginner guide */}
+        <div className="floating-card p-6 mb-8 border-primary/20">
+          <div className="flex items-center gap-2 mb-5">
+            <Zap className="h-4 w-4 text-primary" />
+            <h2 className="font-display font-semibold text-sm">How It Works — Follow These 4 Steps</h2>
+            <Badge variant="secondary" className="ml-auto text-xs">Start here</Badge>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              {
+                step: 1, icon: FileText, color: "bg-primary/10 border-primary/20 text-primary",
+                title: "Enter Requirement",
+                desc: "Paste any software requirement in plain English. AI will read it and generate full test cases for you.",
+                url: "/requirements", cta: "Go to Step 1",
+              },
+              {
+                step: 2, icon: TestTubes, color: "bg-secondary/10 border-secondary/20 text-secondary",
+                title: "Review Test Cases",
+                desc: "See the generated tests grouped by type — functional, edge cases, API, failure, and regression.",
+                url: "/generated-tests", cta: "Go to Step 2",
+              },
+              {
+                step: 3, icon: Play, color: "bg-success/10 border-success/20 text-success",
+                title: "Run the Tests",
+                desc: "Execute all tests with one click. See which pass or fail with timing and result breakdown.",
+                url: "/test-execution", cta: "Go to Step 3",
+              },
+              {
+                step: 4, icon: ArrowUpDown, color: "bg-warning/10 border-warning/20 text-warning",
+                title: "View Priority Ranking",
+                desc: "AI ranks tests by risk and failure history so you fix the most critical issues first.",
+                url: "/prioritization", cta: "Go to Step 4",
+              },
+            ].map((s, i) => (
+              <motion.div
+                key={s.step}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.08 }}
+                className="flex flex-col gap-3 p-4 rounded-xl border border-border/40 bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer group"
+                onClick={() => navigate(s.url)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`h-8 w-8 rounded-lg border flex items-center justify-center ${s.color}`}>
+                    <s.icon className="h-4 w-4" />
+                  </div>
+                  <span className={`text-xs font-bold font-mono ${s.color.split(" ").pop()}`}>Step {s.step}</span>
+                </div>
+                <div>
+                  <p className="font-display font-semibold text-sm mb-1">{s.title}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{s.desc}</p>
+                </div>
+                <Button variant="ghost" size="sm" className="mt-auto self-start text-xs p-0 h-auto text-muted-foreground group-hover:text-foreground gap-1">
+                  {s.cta} <ArrowRight className="h-3 w-3" />
+                </Button>
+              </motion.div>
+            ))}
           </div>
         </div>
 

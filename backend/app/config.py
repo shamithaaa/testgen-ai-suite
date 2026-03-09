@@ -8,8 +8,11 @@ class Settings(BaseSettings):
     MONGODB_URI: str = "mongodb://localhost:27017"
     MONGODB_DB: str = "testgen_suite"
 
-    # Gemini AI
-    GEMINI_API_KEY: str = ""
+    # Azure OpenAI
+    AZURE_OPENAI_ENDPOINT: str = ""
+    AZURE_OPENAI_KEY: str = ""
+    AZURE_OPENAI_DEPLOYMENT: str = "gpt-4o"
+    AZURE_OPENAI_API_VERSION: str = "2024-02-01"
 
     # App
     APP_ENV: str = "development"

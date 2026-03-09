@@ -1,59 +1,67 @@
 """
-Synthetic data service: generates vehicle telemetry via Gemini and persists it.
+Synthetic data service: generates requirement-driven test data via Gemini and persists it.
 """
 from datetime import datetime
-from typing import Any
+from bson import ObjectId
 
 from app.database import get_db
-from app.models.synthetic_data import VehicleTelemetryOut
+from app.models.synthetic_data import SchemaField, SyntheticDatasetOut
 from app.services import ai_service
 
 
-async def generate_and_store(count: int, scenario: str | None) -> list[VehicleTelemetryOut]:
+async def generate_and_store(requirement_id: str, count: int) -> SyntheticDatasetOut:
     db = get_db()
 
-    raw = await ai_service.generate_synthetic_telemetry(count, scenario)
+    # ── 1. Fetch the requirement text ──────────────────────────────────────
+    req_doc = await db.requirements.find_one({"_id": ObjectId(requirement_id)})
+    if not req_doc:
+        raise ValueError(f"Requirement '{requirement_id}' not found")
+    requirement_text: str = req_doc["text"]
 
-    docs: list[dict[str, Any]] = []
-    for r in raw:
-        docs.append({
-            "vehicle_id": r.get("vehicle_id", "TRK-0000"),
-            "lat": float(r.get("lat", 34.05)),
-            "lng": float(r.get("lng", -118.24)),
-            "engine_temp": float(r.get("engine_temp", 200)),
-            "rpm": int(r.get("rpm", 1500)),
-            "fuel_level": float(r.get("fuel_level", 50)),
-            "oil_pressure": float(r.get("oil_pressure", 45)),
-            "speed": float(r.get("speed", 0)),
-            "trip_id": r.get("trip_id", "TRIP-0000"),
-            "status": r.get("status", "Active"),
-            "timestamp": datetime.utcnow(),
-        })
+    # ── 2. Ask Gemini to design a schema + generate rows ───────────────────
+    result = await ai_service.generate_requirement_based_data(requirement_text, count)
 
-    if docs:
-        await db.synthetic_data.insert_many(docs)
+    raw_schema: list[dict] = result.get("schema", [])
+    rows: list[dict] = result.get("rows", [])
 
-    return await get_telemetry(limit=count)
+    schema_fields = [SchemaField(**f) for f in raw_schema]
+
+    # ── 3. Persist as a dataset document ──────────────────────────────────
+    doc = {
+        "requirement_id": requirement_id,
+        "requirement_text": requirement_text,
+        "count": len(rows),
+        "schema_fields": [f.model_dump() for f in schema_fields],
+        "rows": rows,
+        "generated_at": datetime.utcnow(),
+    }
+    inserted = await db.synthetic_datasets.insert_one(doc)
+
+    return SyntheticDatasetOut(
+        id=str(inserted.inserted_id),
+        requirement_id=requirement_id,
+        requirement_text=requirement_text,
+        count=len(rows),
+        schema_fields=schema_fields,
+        rows=rows,
+        generated_at=doc["generated_at"],
+    )
 
 
-async def get_telemetry(limit: int = 50) -> list[VehicleTelemetryOut]:
+async def get_datasets(limit: int = 10) -> list[SyntheticDatasetOut]:
     db = get_db()
-    cursor = db.synthetic_data.find().sort("timestamp", -1).limit(limit)
+    cursor = db.synthetic_datasets.find().sort("generated_at", -1).limit(limit)
     docs = await cursor.to_list(length=limit)
     return [
-        VehicleTelemetryOut(
+        SyntheticDatasetOut(
             id=str(d["_id"]),
-            vehicle_id=d["vehicle_id"],
-            lat=d["lat"],
-            lng=d["lng"],
-            engine_temp=d["engine_temp"],
-            rpm=d["rpm"],
-            fuel_level=d["fuel_level"],
-            oil_pressure=d["oil_pressure"],
-            speed=d["speed"],
-            trip_id=d["trip_id"],
-            status=d["status"],
-            timestamp=d["timestamp"],
+            requirement_id=d["requirement_id"],
+            requirement_text=d["requirement_text"],
+            count=d["count"],
+            schema_fields=[SchemaField(**f) for f in d["schema_fields"]],
+            rows=d["rows"],
+            generated_at=d["generated_at"],
         )
         for d in docs
     ]
+
