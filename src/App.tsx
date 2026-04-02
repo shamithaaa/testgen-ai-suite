@@ -11,6 +11,7 @@ import GeneratedTests from "./pages/GeneratedTests";
 import SyntheticData from "./pages/SyntheticData";
 import TestExecution from "./pages/TestExecution";
 import Prioritization from "./pages/Prioritization";
+import LiveTestRunner from "./pages/LiveTestRunner";
 import DashboardLayout from "./components/DashboardLayout";
 import NotFound from "./pages/NotFound";
 
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/synthetic-data" element={<SyntheticData />} />
               <Route path="/test-execution" element={<TestExecution />} />
               <Route path="/prioritization" element={<Prioritization />} />
+              <Route path="/live-testing" element={<LiveTestRunner />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

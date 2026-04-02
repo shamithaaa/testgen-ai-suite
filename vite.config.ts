@@ -15,6 +15,10 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    watch: {
+      usePolling: true,
+      interval: 300,
+    },
     hmr: {
       overlay: false,
     },

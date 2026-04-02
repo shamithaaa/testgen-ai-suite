@@ -76,3 +76,15 @@ def _to_out(doc: dict) -> TestCaseOut:
         category=doc["category"],
         created_at=doc["created_at"],
     )
+
+async def update_test_case(tc_id: str, update_data: dict[str, Any]) -> TestCaseOut | None:
+    db = get_db()
+    if not update_data:
+        return await get_test_case_by_id(tc_id)
+        
+    result = await db.test_cases.find_one_and_update(
+        {"tc_id": tc_id},
+        {"$set": update_data},
+        return_document=True
+    )
+    return _to_out(result) if result else None

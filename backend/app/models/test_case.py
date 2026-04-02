@@ -18,6 +18,14 @@ class TestCase(BaseModel):
     model_config = {"populate_by_name": True, "arbitrary_types_allowed": True}
 
 
+class TestCaseUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    severity: Optional[str] = None
+    expected: Optional[str] = None
+    category: Optional[str] = None
+
+
 class TestCaseOut(BaseModel):
     id: str
     requirement_id: str

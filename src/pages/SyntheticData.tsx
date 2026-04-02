@@ -68,9 +68,9 @@ const SyntheticData = () => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         {/* â”€â”€ Header â”€â”€ */}
         <div className="mb-8">
-          <h1 className="text-3xl font-display font-bold mb-2">Synthetic Test Data</h1>
+          <h1 className="text-3xl font-display font-bold mb-2">Synthetic Test Data Generation</h1>
           <p className="text-muted-foreground">
-            Gemini reads your requirement and designs the schema + data rows â€” no templates, no hardcoded fields.
+            The AI engine analyzes your requirement and autonomously designs a tailored data schema with realistic, context-aware records — no predefined templates or hardcoded configurations required.
           </p>
         </div>
 
@@ -78,7 +78,7 @@ const SyntheticData = () => {
         <div className="floating-card p-6 mb-6">
           <h2 className="font-display font-semibold text-sm mb-4 flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            Generate Data from Requirement
+            Generate Dataset from Requirement
           </h2>
 
           <div className="flex flex-wrap gap-3 items-end">
@@ -169,7 +169,7 @@ const SyntheticData = () => {
         {!dsLoading && !displayDataset && !generateMutation.isPending && (
           <div className="floating-card p-10 text-center text-muted-foreground text-sm">
             <Database className="h-8 w-8 mx-auto mb-3 opacity-30" />
-            No datasets yet â€” pick a requirement above and click Generate.
+            No datasets available. Select a requirement above and initiate dataset generation.
           </div>
         )}
 
@@ -193,7 +193,7 @@ const SyntheticData = () => {
             <div className="floating-card p-5">
               <h3 className="font-display font-semibold text-sm mb-3 flex items-center gap-2">
                 <Info className="h-4 w-4 text-primary" />
-                AI-Designed Schema
+                AI-Designed Data Schema
                 <Badge variant="secondary" className="ml-auto text-xs">
                   {displayDataset.schema_fields.length} fields
                 </Badge>
@@ -216,7 +216,7 @@ const SyntheticData = () => {
             <div className="floating-card overflow-hidden">
               <div className="p-4 border-b border-border/30 flex items-center gap-2">
                 <Table2 className="h-4 w-4 text-primary" />
-                <span className="font-display font-semibold text-sm">Data Table</span>
+                <span className="font-display font-semibold text-sm">Generated Data Table</span>
                 <Badge variant="secondary" className="bg-muted text-muted-foreground text-xs ml-2">
                   {displayDataset.rows.length} rows
                 </Badge>

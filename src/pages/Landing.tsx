@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Zap, ArrowRight, TestTubes, Brain, BarChart3, Shield, Moon, Sun } from "lucide-react";
@@ -5,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/use-theme";
 
 const features = [
-  { icon: Brain, title: "AI-Powered Analysis", desc: "Transform requirements into comprehensive test suites automatically" },
-  { icon: TestTubes, title: "Synthetic Data Generation", desc: "Generate realistic test data including telemetry, GPS, and sensor readings" },
-  { icon: BarChart3, title: "Smart Prioritization", desc: "Prioritize tests based on failure history and risk analysis" },
-  { icon: Shield, title: "Regression Detection", desc: "Identify known failures and track test stability over time" },
+  { icon: Brain, title: "Intelligent Requirement Analysis", desc: "Requirements are automatically transformed into structured, comprehensive test suites with full scenario coverage." },
+  { icon: TestTubes, title: "Synthetic Data Generation", desc: "AI-driven generation of realistic test datasets — including telemetry, GPS coordinates, and sensor readings — tailored to your specifications." },
+  { icon: BarChart3, title: "Risk-Based Prioritization", desc: "Test cases are dynamically ranked by failure history and impact severity, ensuring critical issues are addressed first." },
+  { icon: Shield, title: "Regression & Stability Tracking", desc: "Known failures are continuously identified and monitored, enabling teams to track test stability across release cycles." },
 ];
 
 const Landing = () => {
@@ -20,10 +21,10 @@ const Landing = () => {
       {/* Nav */}
       <nav className="flex items-center justify-between px-8 py-5 relative z-10">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
-            <Zap className="h-5 w-5 text-primary" />
+          <div className="h-10 w-10 rounded-lg bg-background border border-border/50 flex items-center justify-center overflow-hidden p-1">
+            <img src="/logo.png" alt="TestSphere logo" className="h-full w-full object-contain scale-125" />
           </div>
-          <span className="font-display font-bold text-lg">TestGen AI</span>
+          <span className="font-display font-bold text-lg">TestSphere</span>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -58,19 +59,19 @@ const Landing = () => {
         >
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-sm mb-8">
             <Zap className="h-3.5 w-3.5" />
-            <span>AI-Driven Test Intelligence</span>
+            <span>Enterprise AI-Driven Test Intelligence</span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-display font-bold leading-tight mb-6">
-            <span className="text-gradient">Intelligent Test</span>
+            <span className="text-gradient">TestSphere</span>
             <br />
-            Generation &amp;
+            Intelligent Test Generation
             <br />
-            Optimization
+            &amp; Optimization
           </h1>
 
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-            Paste a requirement → AI generates tests → run them → get a priority ranking. Four steps, no setup needed.
+            Accelerate quality assurance with AI-powered test generation. Submit a requirement, receive a complete test suite, execute with one click, and obtain a risk-based priority ranking — end to end.
           </p>
 
           <div className="flex items-center gap-4 justify-center mb-10">
@@ -79,7 +80,7 @@ const Landing = () => {
               className="bg-primary text-primary-foreground hover:bg-primary/90 font-display font-semibold px-8 h-12 text-base"
               onClick={() => navigate("/requirements")}
             >
-              Start — Step 1: Enter Requirement
+              Get Started — Submit Requirement
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             <Button
@@ -88,17 +89,17 @@ const Landing = () => {
               className="border-border/50 text-foreground hover:bg-muted/50 font-display h-12 px-8 text-base"
               onClick={() => navigate("/dashboard")}
             >
-              View Dashboard
+              View Intelligence Dashboard
             </Button>
           </div>
 
           {/* 4-step flow strip */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap justify-center">
-            {["1. Enter Requirement", "2. Review Test Cases", "3. Run Tests", "4. Prioritize Results"].map((step, i, arr) => (
-              <>
-                <span key={step} className="px-3 py-1 rounded-full border border-border/40 bg-muted/20">{step}</span>
-                {i < arr.length - 1 && <ArrowRight key={`arrow-${i}`} className="h-3 w-3 text-muted-foreground/40" />}
-              </>
+            {["1. Submit Requirement", "2. Review Test Suite", "3. Execute Tests", "4. Prioritize by Risk"].map((step, i, arr) => (
+              <Fragment key={step}>
+                <span className="px-3 py-1 rounded-full border border-border/40 bg-muted/20">{step}</span>
+                {i < arr.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground/40" />}
+              </Fragment>
             ))}
           </div>
         </motion.div>

@@ -30,27 +30,27 @@ const DATA_SOURCE_OPTIONS: {
   {
     id: "file",
     icon: FileSpreadsheet,
-    title: "Upload Your File",
+    title: "Upload Existing Dataset",
     subtitle: "CSV or Excel (.xlsx)",
-    desc: "Upload an existing test data file. The AI will use your columns and rows as the data context when running tests — great if you already have real-world data.",
+    desc: "Upload a real-world test data file. Column headers and row values are used as the execution context — ideal when validated, production-quality data is available.",
     color: "border-primary/40 hover:border-primary text-primary",
-    badge: "Use real data",
+    badge: "Use existing data",
   },
   {
     id: "columns",
     icon: Columns,
-    title: "Specify Column Names",
-    subtitle: "AI generates the rows",
-    desc: "Type in the column names your data should have (e.g. vehicle_id, speed, fuel_level). The AI will synthesize realistic rows for those columns automatically.",
+    title: "Define Column Schema",
+    subtitle: "AI synthesizes the records",
+    desc: "Specify the required column names (e.g. vehicle_id, speed, fuel_level). The AI engine synthesizes realistic, schema-compliant data rows automatically.",
     color: "border-secondary/40 hover:border-secondary text-secondary",
-    badge: "AI-generated data",
+    badge: "AI-synthesized data",
   },
   {
     id: "auto",
     icon: Sparkles,
-    title: "Let AI Decide",
-    subtitle: "Fully automatic",
-    desc: "Don't worry about data setup — the AI picks the most relevant data context based on your requirement and runs all tests automatically. Best for a quick first pass.",
+    title: "Fully Automated Mode",
+    subtitle: "AI-managed data context",
+    desc: "The AI engine determines the optimal data context from your submitted requirement and executes all tests automatically. Recommended for rapid initial validation.",
     color: "border-success/40 hover:border-success text-success",
     badge: "Recommended",
   },
@@ -209,13 +209,13 @@ const TestExecution = () => {
         <div className="flex items-center gap-3 mb-6 p-4 rounded-xl border border-success/20 bg-success/5">
           <div className="h-9 w-9 rounded-lg bg-success/20 border border-success/30 flex items-center justify-center shrink-0 font-display font-bold text-success text-sm">3</div>
           <div className="flex-1">
-            <span className="font-display font-semibold text-sm">Step 3 of 4 — Run the Tests</span>
+            <span className="font-display font-semibold text-sm">Step 3 of 4 — Execute Test Suite</span>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Choose how to supply test data, then click <strong>Run Tests</strong>. You can upload a file, define columns, or let AI handle it automatically.
+              Select a data source configuration, then initiate execution. Choose to upload an existing file, define a column schema, or allow the AI to manage the data context automatically.
             </p>
           </div>
           <Button size="sm" variant="outline" className="shrink-0 font-display gap-1.5" onClick={() => navigate("/prioritization")}>
-            <ArrowUpDown className="h-3.5 w-3.5" />Skip to Priority<ArrowRight className="h-3.5 w-3.5" />
+            <ArrowUpDown className="h-3.5 w-3.5" />Proceed to Prioritization<ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </div>
 
@@ -224,8 +224,8 @@ const TestExecution = () => {
             <h1 className="text-2xl font-display font-bold mb-1">Test Execution</h1>
             <p className="text-muted-foreground text-sm">
               {phase === "results"
-                ? `Run complete · ${liveResults.length} tests · ${totalDuration}s`
-                : "Select a data source, then run"}
+                ? `Execution complete — ${liveResults.length} test cases · ${totalDuration}s total duration`
+                : "Configure a data source and initiate execution"}
             </p>
           </div>
           {phase === "results" && (
@@ -238,7 +238,7 @@ const TestExecution = () => {
                 setLiveResults([]); setTotalExpected(0); setPreviewData(null); setEditableRows([]);
               }}
             >
-              <RefreshCw className="h-3.5 w-3.5" />New Run
+              <RefreshCw className="h-3.5 w-3.5" />Initiate New Run
             </Button>
           )}
         </div>
@@ -273,7 +273,7 @@ const TestExecution = () => {
                       <p className="text-xs text-muted-foreground leading-relaxed">{opt.desc}</p>
                       {active && (
                         <div className="mt-3 flex items-center gap-1 text-xs font-medium text-current">
-                          <ChevronRight className="h-3 w-3" />Selected
+                          <ChevronRight className="h-3 w-3" />Selected Configuration
                         </div>
                       )}
                     </button>
@@ -287,7 +287,7 @@ const TestExecution = () => {
                   <motion.div key="file-input" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="floating-card p-5 mb-6 overflow-hidden">
                     <div className="flex items-center gap-2 mb-3">
                       <Upload className="h-4 w-4 text-primary" />
-                      <span className="font-display font-semibold text-sm">Upload Test Data File</span>
+                      <span className="font-display font-semibold text-sm">Upload Test Dataset</span>
                       <Badge variant="outline" className="text-[10px] ml-auto">CSV or XLSX</Badge>
                     </div>
                     <div
@@ -315,14 +315,14 @@ const TestExecution = () => {
                       ) : (
                         <>
                           <Upload className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-                          <p className="text-sm font-display font-medium mb-1">Drag & drop your file here</p>
-                          <p className="text-xs text-muted-foreground">or click to browse · CSV or Excel (.xlsx)</p>
+                          <p className="text-sm font-display font-medium mb-1">Drag and drop your file here</p>
+                          <p className="text-xs text-muted-foreground">or click to browse — CSV or Excel (.xlsx) supported</p>
                         </>
                       )}
                     </div>
                     <div className="flex items-start gap-2 mt-3 text-xs text-muted-foreground">
                       <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                      <span>Column headers from your file will be used as the test data context. Up to 50 rows are read for the run.</span>
+                      <span>Column headers from the uploaded file serve as the test data context. A maximum of 50 rows are processed per execution run.</span>
                     </div>
                   </motion.div>
                 )}
@@ -331,12 +331,12 @@ const TestExecution = () => {
                   <motion.div key="cols-input" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="floating-card p-5 mb-6 overflow-hidden">
                     <div className="flex items-center gap-2 mb-3">
                       <Columns className="h-4 w-4 text-secondary" />
-                      <span className="font-display font-semibold text-sm">Enter Column Names</span>
+                      <span className="font-display font-semibold text-sm">Define Column Schema</span>
                     </div>
                     <Textarea
                       value={columnInput}
                       onChange={(e) => setColumnInput(e.target.value)}
-                      placeholder="e.g.  vehicle_id, speed, fuel_level, engine_temp, gps_lat, gps_lng"
+                      placeholder="e.g. vehicle_id, speed, fuel_level, engine_temp, gps_lat, gps_lng"
                       className="min-h-[80px] bg-muted/30 border-border/50 text-foreground placeholder:text-muted-foreground/40 focus:border-secondary/50 resize-none text-sm font-mono mb-3"
                     />
                     {columnInput.trim() && (
@@ -350,7 +350,7 @@ const TestExecution = () => {
                     )}
                     <div className="flex items-start gap-2 text-xs text-muted-foreground">
                       <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                      <span>Separate names with commas. The AI will generate 20 realistic data rows for these columns and use them as the test context.</span>
+                      <span>Enter column names separated by commas. The AI engine synthesizes 20 realistic, schema-compliant data rows for use as the execution context.</span>
                     </div>
                   </motion.div>
                 )}
@@ -360,11 +360,9 @@ const TestExecution = () => {
                     <div className="flex items-start gap-3 mb-4">
                       <Sparkles className="h-4 w-4 text-success mt-0.5 shrink-0" />
                       <div>
-                        <p className="font-display font-semibold text-sm mb-1">Let AI design the dataset</p>
+                        <p className="font-display font-semibold text-sm mb-1">AI-Managed Data Configuration</p>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          Click <strong>Generate Data Preview</strong> to see the rows Gemini creates for your requirement.
-                          You can edit any value, add rows, or delete rows before running.
-                          Or skip straight to running if you just want a quick result.
+                          Select <strong>Generate Data Preview</strong> to review the records synthesized by the AI for your requirement. Individual values, rows, and columns may be modified prior to execution. Alternatively, proceed directly to execution for rapid validation.
                         </p>
                       </div>
                     </div>
@@ -376,7 +374,7 @@ const TestExecution = () => {
                       className="font-display gap-1.5 border-success/40 text-success hover:bg-success/10"
                     >
                       {isPreviewLoading
-                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Generating dataset…</>
+                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Synthesizing dataset…</>
                         : <><Table2 className="h-3.5 w-3.5" />Generate Data Preview</>}
                     </Button>
                   </motion.div>
@@ -393,7 +391,7 @@ const TestExecution = () => {
                     className="font-display gap-2 px-6"
                   >
                     <Play className="h-4 w-4" />
-                    Quick Run (skip preview)
+                    Execute Without Preview
                   </Button>
                 )}
                 <Button
@@ -407,7 +405,7 @@ const TestExecution = () => {
                   ) : dataSource === "auto" ? (
                     <><Table2 className="h-4 w-4" />Generate Data Preview</>
                   ) : (
-                    <><Play className="h-4 w-4" />Confirm &amp; Run Tests</>
+                    <><Play className="h-4 w-4" />Confirm &amp; Execute Tests</>
                   )}
                 </Button>
               </div>
@@ -420,10 +418,10 @@ const TestExecution = () => {
               <div className="floating-card p-5 mb-4">
                 <div className="flex items-center gap-2 mb-4">
                   <Table2 className="h-4 w-4 text-success" />
-                  <span className="font-display font-semibold text-sm">AI-Generated Dataset — Review &amp; Edit</span>
+                  <span className="font-display font-semibold text-sm">AI-Synthesized Dataset — Review &amp; Refine</span>
                   <Badge variant="secondary" className="ml-2 text-xs">{editableRows.length} rows</Badge>
                   <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
-                    <PenLine className="h-3 w-3" />Click any cell to edit
+                    <PenLine className="h-3 w-3" />Select any cell to modify
                   </span>
                 </div>
 
@@ -500,12 +498,12 @@ const TestExecution = () => {
                   </table>
                 </div>
 
-                {/* Add row */}
+                {/* Add Record */}
                 <button
                   onClick={addRow}
                   className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors font-display"
                 >
-                  <Plus className="h-3.5 w-3.5" />Add row
+                  <Plus className="h-3.5 w-3.5" />Add Record
                 </button>
               </div>
 
@@ -516,7 +514,7 @@ const TestExecution = () => {
                   className="font-display gap-1.5"
                   onClick={() => setPhase("select")}
                 >
-                  ← Change data source
+                  ← Change Data Source
                 </Button>
                 <Button
                   size="lg"
@@ -525,7 +523,7 @@ const TestExecution = () => {
                   className="bg-primary text-primary-foreground hover:bg-primary/90 font-display glow-primary gap-2 px-8"
                 >
                   <Play className="h-4 w-4" />
-                  Run Tests with this Data
+                  Execute Tests with this Dataset
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -539,9 +537,9 @@ const TestExecution = () => {
                 <div className="h-14 w-14 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
                   <Loader2 className="h-6 w-6 text-primary animate-spin" />
                 </div>
-                <h3 className="font-display font-semibold text-lg mb-1">Running Test Suite…</h3>
+                <h3 className="font-display font-semibold text-lg mb-1">Executing Test Suite…</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {liveResults.length} / {totalExpected} tests completed
+                  {liveResults.length} of {totalExpected} test cases executed
                 </p>
                 {/* Progress bar */}
                 <div className="h-2 bg-muted rounded-full overflow-hidden max-w-sm mx-auto">
@@ -598,7 +596,7 @@ const TestExecution = () => {
                 <div className="floating-card p-3 mb-5 flex items-center gap-3 text-sm border-border/40">
                   {runStarted.data_source === "file" ? <FileSpreadsheet className="h-4 w-4 text-primary shrink-0" /> : <Columns className="h-4 w-4 text-secondary shrink-0" />}
                   <span className="text-muted-foreground text-xs">
-                    {runStarted.data_source === "file" ? "Used uploaded file data" : "Used AI-generated data"}
+                    {runStarted.data_source === "file" ? "Executed using uploaded file data" : "Executed using AI-synthesized data"}
                     {runStarted.data_columns && runStarted.data_columns.length > 0 && (
                       <> · columns: {runStarted.data_columns.map((c) => <Badge key={c} variant="outline" className="ml-1 text-[10px] font-mono">{c}</Badge>)}</>
                     )}
@@ -624,7 +622,7 @@ const TestExecution = () => {
                 {/* Success rate */}
                 <div className="floating-card p-5 flex flex-col items-center justify-center">
                   <TrendingUp className="h-4 w-4 text-primary mb-2" />
-                  <span className="text-xs text-muted-foreground mb-1">Success Rate</span>
+                  <span className="text-xs text-muted-foreground mb-1">Overall Success Rate</span>
                   <span className="text-4xl font-display font-bold text-gradient">{successRate}%</span>
                   <div className="w-full mt-4 h-2 bg-muted rounded-full overflow-hidden">
                     <motion.div className="h-full bg-gradient-to-r from-success to-primary rounded-full" initial={{ width: 0 }} animate={{ width: `${successRate}%` }} transition={{ duration: 1, delay: 0.3 }} />
@@ -633,7 +631,7 @@ const TestExecution = () => {
 
                 {/* Pie */}
                 <div className="floating-card p-5">
-                  <h3 className="font-display font-semibold text-sm mb-2 text-center">Pass vs Fail</h3>
+                  <h3 className="font-display font-semibold text-sm mb-2 text-center">Pass vs. Fail Breakdown</h3>
                   <ResponsiveContainer width="100%" height={160}>
                     <PieChart>
                       <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={4} dataKey="value">
@@ -650,7 +648,7 @@ const TestExecution = () => {
 
                 {/* Coverage */}
                 <div className="floating-card p-5">
-                  <h3 className="font-display font-semibold text-sm mb-4">Test Coverage</h3>
+                  <h3 className="font-display font-semibold text-sm mb-4">Test Coverage Analysis</h3>
                   {[{ label: "Functional", pct: 85 }, { label: "Edge Cases", pct: 60 }, { label: "API", pct: 75 }, { label: "Regression", pct: 50 }].map((c, i) => (
                     <div key={c.label} className="mb-3">
                       <div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">{c.label}</span><span className="font-mono">{c.pct}%</span></div>
@@ -666,9 +664,9 @@ const TestExecution = () => {
               <div className="floating-card overflow-hidden">
                 <div className="p-4 border-b border-border/30 flex items-center gap-2">
                   <Clock className="h-4 w-4 text-primary" />
-                  <span className="font-display font-semibold text-sm">Full Execution Results</span>
-                  <Badge variant="secondary" className="ml-2 text-xs">{liveResults.length} tests</Badge>
-                  {activeRunId && <span className="text-xs font-mono text-muted-foreground ml-auto">run: {activeRunId.slice(0, 8)}…</span>}
+                  <span className="font-display font-semibold text-sm">Complete Execution Results</span>
+                  <Badge variant="secondary" className="ml-2 text-xs">{liveResults.length} test cases</Badge>
+                  {activeRunId && <span className="text-xs font-mono text-muted-foreground ml-auto">Run ID: {activeRunId.slice(0, 8)}…</span>}
                 </div>
 
                 {/* Failed tests first, then passed */}
@@ -725,7 +723,7 @@ const TestExecution = () => {
               <div className="mt-6 flex justify-end">
                 <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-display gap-2" onClick={() => navigate("/prioritization")}>
                   <ArrowUpDown className="h-4 w-4" />
-                  Next: View Priority Ranking
+                  Proceed to Priority Ranking
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>

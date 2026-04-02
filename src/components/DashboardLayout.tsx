@@ -2,7 +2,7 @@ import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Zap, ChevronDown, User } from "lucide-react";
+import { ChevronDown, User } from "lucide-react";
 
 const DashboardLayout = () => {
   return (
@@ -15,16 +15,16 @@ const DashboardLayout = () => {
               <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
               <div className="h-5 w-px bg-border" />
               <div className="flex items-center gap-2">
-                <div className="h-6 w-6 rounded-md bg-primary/20 flex items-center justify-center">
-                  <Zap className="h-3.5 w-3.5 text-primary" />
+                <div className="h-7 w-7 rounded-md bg-background border border-border/50 flex items-center justify-center overflow-hidden p-1">
+                  <img src="/logo.png" alt="TestSphere logo" className="h-full w-full object-contain scale-125" />
                 </div>
-                <span className="font-display font-semibold text-sm">TestGen AI</span>
+                <span className="font-display font-semibold text-sm">TestSphere</span>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <ThemeToggle />
               <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-muted/50">
-                <span>Workspace</span>
+                <span>My Workspace</span>
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
               <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/40 to-secondary/40 flex items-center justify-center">

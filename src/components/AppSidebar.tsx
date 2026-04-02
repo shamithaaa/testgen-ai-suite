@@ -5,7 +5,7 @@ import {
   Database,
   Play,
   ArrowUpDown,
-  Zap,
+  Clapperboard,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -23,14 +23,15 @@ import {
 } from "@/components/ui/sidebar";
 
 const workflowSteps = [
-  { step: 1, title: "Requirements", url: "/requirements", icon: FileText, hint: "Paste your requirement" },
-  { step: 2, title: "Generated Tests", url: "/generated-tests", icon: TestTubes, hint: "Review AI test cases" },
-  { step: 3, title: "Test Execution", url: "/test-execution", icon: Play, hint: "Run & see results" },
-  { step: 4, title: "Prioritization", url: "/prioritization", icon: ArrowUpDown, hint: "AI-ranked by risk" },
+  { step: 1, title: "Requirements", url: "/requirements", icon: FileText, hint: "Submit & analyze requirements" },
+  { step: 2, title: "Test Suite", url: "/generated-tests", icon: TestTubes, hint: "Review AI-generated test cases" },
+  { step: 3, title: "Test Execution", url: "/test-execution", icon: Play, hint: "Execute & analyze results" },
+  { step: 4, title: "Risk Ranking", url: "/prioritization", icon: ArrowUpDown, hint: "Prioritized by risk & severity" },
 ];
 
 const toolItems = [
-  { title: "Synthetic Data", url: "/synthetic-data", icon: Database, hint: "Generate vehicle data" },
+  { title: "Synthetic Data", url: "/synthetic-data", icon: Database, hint: "AI-generated test datasets" },
+  { title: "Live Test Runner", url: "/live-testing", icon: Clapperboard, hint: "Repository → AI → Browser execution" },
 ];
 
 export function AppSidebar() {
@@ -43,13 +44,17 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-border/50">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
-            <Zap className="h-4 w-4 text-primary" />
+          <div className="h-9 w-9 rounded-lg bg-background border border-border/50 flex items-center justify-center flex-shrink-0 overflow-hidden p-1">
+            <img
+              src="/logo.png"
+              alt="TestSphere logo"
+              className="h-full w-full object-contain scale-125"
+            />
           </div>
           {!collapsed && (
             <div>
-              <h2 className="font-display font-bold text-sm text-foreground">TestGen AI</h2>
-              <p className="text-[10px] text-muted-foreground">Intelligent Testing</p>
+              <h2 className="font-display font-bold text-sm text-foreground">TestSphere</h2>
+              <p className="text-[10px] text-muted-foreground">AI-Powered Quality Assurance</p>
             </div>
           )}
         </div>
@@ -58,13 +63,19 @@ export function AppSidebar() {
       <SidebarContent>
         {/* Overview */}
         <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60 px-3 pb-1">Overview</SidebarGroupLabel>}
+          {!collapsed && (
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              Overview
+            </SidebarGroupLabel>
+          )}
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={isActive("/dashboard")} tooltip="Dashboard">
                   <NavLink to="/dashboard" end className="transition-colors" activeClassName="bg-primary/10 text-primary">
-                    <LayoutDashboard className="h-4 w-4" />
+                    <div className="h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0">
+                      <LayoutDashboard className="h-4 w-4" />
+                    </div>
                     {!collapsed && <span>Dashboard</span>}
                   </NavLink>
                 </SidebarMenuButton>
@@ -75,7 +86,11 @@ export function AppSidebar() {
 
         {/* Workflow steps */}
         <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60 px-3 pb-1">Workflow</SidebarGroupLabel>}
+          {!collapsed && (
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              Workflow
+            </SidebarGroupLabel>
+          )}
           <SidebarGroupContent>
             <SidebarMenu>
               {workflowSteps.map((item) => (
@@ -84,6 +99,7 @@ export function AppSidebar() {
                     asChild
                     isActive={isActive(item.url)}
                     tooltip={`Step ${item.step}: ${item.title}`}
+                    size={collapsed ? "default" : "lg"}
                   >
                     <NavLink
                       to={item.url}
@@ -91,7 +107,7 @@ export function AppSidebar() {
                       className="transition-colors"
                       activeClassName="bg-primary/10 text-primary"
                     >
-                      <div className="relative flex-shrink-0">
+                      <div className="relative h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0">
                         <item.icon className="h-4 w-4" />
                         <span className={`absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full text-[8px] font-bold flex items-center justify-center ${isActive(item.url) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                           {item.step}
@@ -113,14 +129,25 @@ export function AppSidebar() {
 
         {/* Tools */}
         <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60 px-3 pb-1">Tools</SidebarGroupLabel>}
+          {!collapsed && (
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              Tools
+            </SidebarGroupLabel>
+          )}
           <SidebarGroupContent>
             <SidebarMenu>
               {toolItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                    size={collapsed ? "default" : "lg"}
+                  >
                     <NavLink to={item.url} end className="transition-colors" activeClassName="bg-primary/10 text-primary">
-                      <item.icon className="h-4 w-4" />
+                      <div className="h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0">
+                        <item.icon className="h-4 w-4" />
+                      </div>
                       {!collapsed && (
                         <div className="flex flex-col min-w-0">
                           <span className="text-sm leading-tight">{item.title}</span>

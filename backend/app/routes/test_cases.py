@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
+from app.models.test_case import TestCaseUpdate
 from app.services import test_case_service
 
 router = APIRouter(prefix="/test-cases", tags=["Test Cases"])
@@ -33,3 +34,12 @@ async def get_test_case(tc_id: str):
     if not tc:
         raise HTTPException(status_code=404, detail=f"Test case {tc_id} not found")
     return tc
+
+
+@router.put("/{tc_id}")
+async def update_test_case(tc_id: str, tc_update: TestCaseUpdate):
+    update_data = {k: v for k, v in tc_update.model_dump().items() if v is not None}
+    updated_tc = await test_case_service.update_test_case(tc_id, update_data)
+    if not updated_tc:
+        raise HTTPException(status_code=404, detail=f"Test case {tc_id} not found")
+    return updated_tc

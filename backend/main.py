@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import connect_db, close_db
-from app.routes import requirements, test_cases, test_execution, synthetic_data, prioritization, dashboard
+from app.routes import requirements, test_cases, test_execution, synthetic_data, prioritization, dashboard, repo_analysis
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.include_router(test_execution.router, prefix=API_PREFIX)
 app.include_router(synthetic_data.router, prefix=API_PREFIX)
 app.include_router(prioritization.router, prefix=API_PREFIX)
 app.include_router(dashboard.router, prefix=API_PREFIX)
+app.include_router(repo_analysis.router, prefix=API_PREFIX)
 
 
 @app.get("/", tags=["Health"])

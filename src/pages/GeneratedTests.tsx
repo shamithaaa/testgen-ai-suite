@@ -4,8 +4,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronRight, TestTubes, AlertTriangle, Globe, XCircle, RotateCcw, Loader2, ServerCrash, ArrowRight, Play } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useGroupedTestCases } from "@/hooks/use-test-cases";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useGroupedTestCases, useUpdateTestCase } from "@/hooks/use-test-cases";
 import { mockTestCases } from "@/lib/mockData";
+import { Edit2 } from "lucide-react";
 
 const SECTION_META = [
   { key: "functional", label: "Functional Tests", icon: TestTubes },
@@ -25,9 +29,29 @@ const severityColors: Record<string, string> = {
 const GeneratedTests = () => {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ functional: true });
+  const [editingTest, setEditingTest] = useState<any | null>(null);
   const requirementId = localStorage.getItem("lastRequirementId") ?? undefined;
 
   const { data, isLoading, isError } = useGroupedTestCases(requirementId);
+  const updateMutation = useUpdateTestCase();
+
+  const handleSaveEdit = async () => {
+    if (!editingTest) return;
+    try {
+      await updateMutation.mutateAsync({
+        tc_id: editingTest.tc_id || editingTest.id,
+        payload: {
+          name: editingTest.name,
+          description: editingTest.description,
+          expected: editingTest.expected,
+          severity: editingTest.severity,
+        },
+      });
+      setEditingTest(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const toggle = (key: string) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
 
@@ -39,7 +63,7 @@ const GeneratedTests = () => {
     return (
       <div className="max-w-5xl mx-auto flex flex-col items-center justify-center py-24 gap-4">
         <Loader2 className="h-10 w-10 text-primary animate-spin" />
-        <p className="text-muted-foreground text-sm">Loading generated test cases…</p>
+        <p className="text-muted-foreground text-sm">Loading test suite…</p>
       </div>
     );
   }
@@ -52,10 +76,10 @@ const GeneratedTests = () => {
           <div className="h-9 w-9 rounded-lg bg-secondary/20 border border-secondary/30 flex items-center justify-center shrink-0 font-display font-bold text-secondary text-sm">2</div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="font-display font-semibold text-sm">Step 2 of 4 — Review Generated Tests</span>
-              <Badge variant="outline" className="text-[10px] border-secondary/30 text-secondary bg-secondary/10">{total} tests ready</Badge>
+              <span className="font-display font-semibold text-sm">Step 2 of 4 — Review Generated Test Suite</span>
+              <Badge variant="outline" className="text-[10px] border-secondary/30 text-secondary bg-secondary/10">{total} test cases ready</Badge>
             </div>
-            <p className="text-xs text-muted-foreground">Browse the AI-generated test cases grouped by category. When you're ready, move on to Step 3 to actually run them.</p>
+            <p className="text-xs text-muted-foreground">Review the AI-generated test cases organized by category. Modify individual test cases as needed, then proceed to Step 3 to execute the suite.</p>
           </div>
           <Button
             size="sm"
@@ -70,23 +94,23 @@ const GeneratedTests = () => {
 
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-display font-bold mb-1">Generated Test Cases</h1>
+            <h1 className="text-2xl font-display font-bold mb-1">AI-Generated Test Suite</h1>
             <p className="text-muted-foreground text-sm">
               {isError
-                ? "Showing cached mock data — backend unreachable"
-                : "AI-generated test suite based on your requirements"}
+                ? "Live data unavailable — displaying cached reference test suite"
+                : "Comprehensive test suite generated from your submitted requirement"}
             </p>
           </div>
           <div className="floating-card px-4 py-2">
             <span className="text-2xl font-display font-bold text-primary">{total}</span>
-            <span className="text-sm text-muted-foreground ml-2">tests generated</span>
+            <span className="text-sm text-muted-foreground ml-2">test cases generated</span>
           </div>
         </div>
 
         {isError && (
           <div className="floating-card p-4 mb-6 border-warning/30 flex items-center gap-3 text-sm text-warning">
             <ServerCrash className="h-4 w-4 shrink-0" />
-            Could not reach backend. Showing mock data. Start the server with{" "}
+            The analysis service is currently unreachable. Displaying reference data. To restore live connectivity, start the server with{" "}
             <code className="font-mono bg-muted px-1 rounded">uv run uvicorn main:app --reload --port 8000</code>
           </div>
         )}
@@ -138,21 +162,25 @@ const GeneratedTests = () => {
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: i * 0.05 }}
-                              className="p-4 rounded-lg bg-muted/20 border border-border/30"
+                              className="group relative p-5 rounded-xl bg-[#fefdfb] border border-secondary/20 shadow-sm transition-shadow hover:shadow-md"
                             >
-                              <div className="flex items-start justify-between mb-2">
-                                <div className="flex items-center gap-3">
-                                  <span className="font-mono text-xs text-muted-foreground">{tcId}</span>
-                                  <span className="font-display font-medium text-sm">{tc.name}</span>
-                                </div>
-                                <Badge variant="outline" className={`text-xs ${severityColors[tc.severity]}`}>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="absolute right-2 top-11 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => setEditingTest(tc)}
+                              >
+                                <Edit2 className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                              <div className="flex items-start justify-between mb-3 pr-10">
+                                <span className="font-display font-bold text-lg leading-tight text-foreground/90">{tc.name}</span>
+                                <Badge variant="secondary" className="bg-[#eef5e7] text-[#2c6517] hover:bg-[#eef5e7] border-none shrink-0 font-medium">
                                   {tc.severity}
                                 </Badge>
                               </div>
-                              <p className="text-xs text-muted-foreground mb-2">{tc.description}</p>
-                              <div className="text-xs">
-                                <span className="text-muted-foreground">Expected: </span>
-                                <span className="text-foreground/80">{tc.expected}</span>
+                              <p className="text-sm text-foreground/70 mb-4 leading-relaxed pr-8">{tc.description}</p>
+                              <div className="text-sm font-medium text-[#3b8520]">
+                                {tc.expected}
                               </div>
                             </motion.div>
                           );
@@ -166,6 +194,61 @@ const GeneratedTests = () => {
           })}
         </div>
       </motion.div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingTest} onOpenChange={(open) => !open && setEditingTest(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Test Case</DialogTitle>
+            <DialogDescription>Update the test case details and expected outcome below.</DialogDescription>
+          </DialogHeader>
+          {editingTest && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Name</label>
+                <Input
+                  value={editingTest.name}
+                  onChange={(e) => setEditingTest({ ...editingTest, name: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Severity</label>
+                <select
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  value={editingTest.severity}
+                  onChange={(e) => setEditingTest({ ...editingTest, severity: e.target.value })}
+                >
+                  <option value="Critical">Critical</option>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Description</label>
+                <Textarea
+                  value={editingTest.description}
+                  onChange={(e) => setEditingTest({ ...editingTest, description: e.target.value })}
+                  className="min-h-[100px]"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Expected Result</label>
+                <Input
+                  value={editingTest.expected}
+                  onChange={(e) => setEditingTest({ ...editingTest, expected: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingTest(null)}>Cancel</Button>
+            <Button onClick={handleSaveEdit} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Saving Changes..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

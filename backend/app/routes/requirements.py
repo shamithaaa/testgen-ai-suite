@@ -13,7 +13,7 @@ async def analyze_requirement(body: RequirementCreate):
     Returns the new requirement with a summary of generated tests.
     """
     try:
-        result = await requirement_service.create_requirement(body.text)
+        result = await requirement_service.create_requirement(body.text, body.instructions)
         return result
     except AIQuotaError as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc

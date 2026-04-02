@@ -10,7 +10,7 @@ from app.services import ai_service
 from app.services.test_case_service import create_test_cases_from_ai
 
 
-async def create_requirement(text: str) -> dict:
+async def create_requirement(text: str, instructions: str = None) -> dict:
     db = get_db()
 
     # Insert requirement
@@ -23,7 +23,7 @@ async def create_requirement(text: str) -> dict:
     req_id = str(result.inserted_id)
 
     # Generate tests via Gemini
-    ai_data = await ai_service.generate_test_cases(text)
+    ai_data = await ai_service.generate_test_cases(text, instructions)
 
     # Persist test cases
     await create_test_cases_from_ai(req_id, ai_data)

@@ -14,3 +14,13 @@ export function useTestCases(requirementId?: string, category?: string) {
     queryFn: () => api.getTestCases(requirementId, category),
   });
 }
+
+export function useUpdateTestCase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tc_id, payload }: { tc_id: string; payload: any }) => api.updateTestCase(tc_id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["test-cases"] });
+    },
+  });
+}

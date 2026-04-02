@@ -46,19 +46,19 @@ const Prioritization = () => {
           <div className="h-9 w-9 rounded-lg bg-warning/20 border border-warning/30 flex items-center justify-center shrink-0 font-display font-bold text-warning text-sm">4</div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="font-display font-semibold text-sm">Step 4 of 4 — View Priority Ranking</span>
+              <span className="font-display font-semibold text-sm">Step 4 of 4 — Risk-Based Priority Ranking</span>
               <Badge variant="outline" className="text-[10px] border-warning/30 text-warning bg-warning/10">Final Step</Badge>
             </div>
-            <p className="text-xs text-muted-foreground">AI ranks all tests by risk and failure history. Focus on "High Priority" tests first — these are the ones most likely to uncover real issues. "Refresh AI Ranking" re-runs the analysis with latest data.</p>
+            <p className="text-xs text-muted-foreground">Test cases are ranked by risk exposure and failure history. Address <strong>High Priority</strong> items first — these represent the greatest probability of uncovering critical defects. Use <strong>Refresh Priority Ranking</strong> to re-evaluate with the latest execution data.</p>
           </div>
         </div>
 
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-display font-bold mb-1">Test Prioritization</h1>
+              <h1 className="text-2xl font-display font-bold mb-1">Risk-Based Test Prioritization</h1>
               <p className="text-muted-foreground text-sm">
-                {isError ? "Showing cached mock data — backend unreachable" : "AI-ranked test execution order based on failure history and risk"}
+                {isError ? "Live data unavailable — displaying cached reference prioritization" : "AI-ranked test execution order derived from failure history, risk exposure, and severity"}
               </p>
             </div>
             <Button
@@ -69,9 +69,9 @@ const Prioritization = () => {
               className="font-display"
             >
               {refreshMutation.isPending ? (
-                <><Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />Re-ranking…</>
+                <><Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />Re-evaluating Priorities…</>
               ) : (
-                <><RefreshCw className="h-3.5 w-3.5 mr-2" />Refresh AI Ranking</>
+                <><RefreshCw className="h-3.5 w-3.5 mr-2" />Refresh Priority Ranking</>
               )}
             </Button>
           </div>
@@ -87,7 +87,7 @@ const Prioritization = () => {
           >
             <div className="p-4 border-b border-border/30 flex items-center gap-2">
               <Bug className="h-4 w-4 text-destructive" />
-              <span className="font-display font-semibold text-sm">Known Failures – Awaiting Fix</span>
+              <span className="font-display font-semibold text-sm">Known Failures — Pending Resolution</span>
               <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/20 text-xs ml-2">
                 {knownFailures.length}
               </Badge>
@@ -135,7 +135,7 @@ const Prioritization = () => {
               </div>
 
               {section.items.length === 0 ? (
-                <p className="p-4 text-sm text-muted-foreground">No tests in this priority level</p>
+                <p className="p-4 text-sm text-muted-foreground">No test cases currently assigned to this priority level.</p>
               ) : (
                 <div className="divide-y divide-border/20">
                   {section.items.map((t, i) => (

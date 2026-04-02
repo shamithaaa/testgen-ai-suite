@@ -68,13 +68,14 @@ def _clean_json(raw: str) -> str:
     return raw.strip()
 
 
-async def generate_test_cases(requirement: str) -> dict[str, list[dict[str, str]]]:
+async def generate_test_cases(requirement: str, instructions: str = None) -> dict[str, list[dict[str, str]]]:
     """
     Returns a dict with keys: functional, edge, api, failure, regression.
     Each value is a list of test-case objects.
     """
     prompt = f"""
 You are a senior QA engineer. Given the software requirement below, generate comprehensive test cases.
+{f"USER INSTRUCTIONS: {instructions}" if instructions else ""}
 
 REQUIREMENT:
 {requirement}
@@ -195,6 +196,343 @@ Vary the values realistically across rows."""
     # Accept either a bare array or {"rows": [...]}
     rows: list[dict[str, Any]] = parsed if isinstance(parsed, list) else parsed.get("rows", parsed)
     return rows
+
+
+async def analyze_codebase(codebase_content: str, target_url: str) -> dict[str, Any]:
+    """
+    Analyse an extracted codebase and return structured UI information:
+    summary, tech_stack, pages (with key elements), and user flows.
+    """
+    prompt = f"""You are a senior QA engineer performing UI analysis on a web application codebase.
+
+TARGET URL: {target_url}
+
+CODEBASE (extracted source files):
+{codebase_content[:70000]}
+
+Carefully read the code and identify:
+1. All distinct pages / views / routes in this application
+2. The key interactive UI elements on each page (buttons, inputs, links, modals, forms)
+3. The main user flows (sequences of actions a user would follow)
+4. The technology stack being used
+
+Return ONLY valid JSON (no markdown, no explanation) with exactly this shape:
+{{
+  "summary": "One-paragraph description of what this application does",
+  "tech_stack": "e.g. React + TypeScript + Tailwind + React Router",
+  "pages": [
+    {{
+      "name": "Human-readable page name",
+      "path": "/route-path",
+      "description": "What the user can do on this page",
+      "key_elements": ["Login button", "Email input", "Password input", "Remember me checkbox"]
+    }}
+  ],
+  "user_flows": [
+    {{
+      "name": "Flow name (e.g. User Registration)",
+      "steps": ["Navigate to /register", "Fill name field", "Fill email field", "Submit form", "See confirmation"]
+    }}
+  ]
+}}
+
+Rules:
+- Identify 3–8 pages. If the app has fewer pages, identify all of them.
+- Identify 2–5 meaningful user flows.
+- key_elements must name the actual UI text/labels visible in the code (e.g. "Sign In button" not "button").
+- path must be the actual route path as defined in the router.
+"""
+    raw = await _call_openai(prompt)
+    text = _clean_json(raw)
+    return json.loads(text)
+
+
+async def generate_playwright_tests(
+    analysis: dict[str, Any],
+    target_url: str,
+    test_email: str | None = None,
+    test_password: str | None = None,
+    test_preferences: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Given a structured codebase analysis, generate Playwright test cases with
+    specific, executable steps (navigate, click, fill, assert_text, screenshot).
+    Real credentials (test_email / test_password) are injected so that login tests
+    use actual values instead of placeholders.
+    """
+    # Build credentials hint for the prompt
+    cred_section = ""
+    if test_email and test_password:
+        cred_section = f"""
+REAL TEST CREDENTIALS (use these exact values in fill steps for login forms):
+  Email:    {test_email}
+  Password: {test_password}
+
+IMPORTANT: Replace any placeholder email/password values with the credentials above.
+Do NOT use "testuser@example.com" or "Password123!" — use the real credentials provided.
+"""
+    elif test_email:
+        cred_section = f"""
+REAL TEST CREDENTIALS:
+  Email:    {test_email}
+  Password: (not provided — skip tests that require a password)
+"""
+    else:
+        cred_section = """
+TEST CREDENTIALS: Not provided.
+Use placeholder values but add a comment in the description that real credentials are needed.
+"""
+
+    prompt = f"""You are a senior Playwright test automation engineer with deep expertise in React, Radix UI, and modern component libraries.
+
+TARGET URL: {target_url}
+{cred_section}
+APPLICATION ANALYSIS:
+{json.dumps(analysis, indent=2)}
+
+Generate comprehensive Playwright test cases that cover the pages and user flows above.
+
+{f"USER TEST PREFERENCES:\\n{test_preferences}\\n\\nPrioritize generating tests that match the preferences above." if test_preferences else ""}
+
+Return ONLY valid JSON (no markdown) with exactly this shape:
+{{
+  "tests": [
+    {{
+      "name": "Descriptive test name",
+      "description": "What this test verifies",
+      "page_name": "Name of the page being tested",
+      "severity": "Critical|High|Medium|Low",
+      "steps": [
+        {{
+          "action": "navigate",
+          "selector": null,
+          "value": "/route-path",
+          "description": "Navigate to the page"
+        }},
+        {{
+          "action": "screenshot",
+          "selector": null,
+          "value": null,
+          "description": "Capture page load state"
+        }},
+        {{
+          "action": "fill",
+          "selector": "input[type=\\"email\\"]",
+          "value": "{test_email or 'user@example.com'}",
+          "description": "Enter email address"
+        }},
+        {{
+          "action": "fill",
+          "selector": "input[type=\\"password\\"]",
+          "value": "{test_password or 'yourpassword'}",
+          "description": "Enter password"
+        }},
+        {{
+          "action": "click",
+          "selector": "button:has-text(\\"Sign In\\")",
+          "value": null,
+          "description": "Click the Sign In button"
+        }},
+        {{
+          "action": "wait",
+          "selector": null,
+          "value": "4",
+          "description": "Wait for redirect to complete"
+        }},
+        {{
+          "action": "assert_text",
+          "selector": null,
+          "value": "Text expected to be visible after action",
+          "description": "Verify the expected result"
+        }},
+        {{
+          "action": "screenshot",
+          "selector": null,
+          "value": null,
+          "description": "Capture final state"
+        }}
+      ]
+    }}
+  ]
+}}
+
+STRICT RULES — follow every rule or tests will fail:
+
+GENERAL:
+- Generate 5–8 test cases covering different pages and user flows.
+- ALWAYS start each test with a "navigate" step.
+- Include at least 2 "screenshot" steps per test (beginning and end).
+- For login fill steps, use EXACTLY the credentials provided above (not placeholders).
+- After clicking a submit/login button, add a "wait" step of "4" seconds before asserting.
+
+SELECTOR RULES (critical):
+- For button clicks: ALWAYS use button:has-text("Label") — NEVER use text=Label.
+- For link clicks: use a:has-text("Label") or [role="link"]:has-text("Label").
+- For standard inputs: input[type="email"], input[type="password"].
+- For dialog/modal inputs: use selector '[role="dialog"] input' (NOT input[type="text"] since type may be absent).
+- For inputs with placeholder: ALWAYS quote: input[placeholder="Search tasks..."] NOT input[placeholder=Search tasks...].
+- CSS attribute values with spaces or special chars MUST use double quotes.
+- For role-based elements: [role="dialog"], [role="checkbox"], button[type="submit"].
+
+RADIX UI / CUSTOM COMPONENTS (CRITICAL — read carefully):
+- Checkboxes in Radix UI are NOT native inputs. Use [role="checkbox"] or [data-state="unchecked"] NOT input[type="checkbox"].
+- Radix UI <Select> triggers render with role="combobox", NOT as plain <button> elements.
+  To click a Radix Select trigger:
+    • Inside a dialog: use '[role="dialog"] [role="combobox"]'   ← NOT '[role="dialog"] button:has-text("Priority")'
+    • On the page: use '[role="combobox"]' or '[role="combobox"]:has-text("placeholder text")'
+  After clicking the combobox trigger, click the option: [role="option"]:has-text("Value")
+- NEVER write 'button:has-text("Priority")' or 'button:has-text("Sort")' for Radix Select triggers — they will ALWAYS timeout.
+- For plain filter chips (All/Active/Completed toggle buttons that are real buttons): button:has-text("Completed") is fine.
+
+LIST ITEMS (CRITICAL):
+- Do NOT assume task/todo/item list entries are <li> elements. Modern React apps often use <div> or <article>.
+- For hover_and_click containers, use: '[class*="item"]', '[class*="task"]', '[class*="card"]', 'article', '[role="listitem"]'
+- Do NOT use bare 'li:has-text("...")' for task list items — use '[class*="item"]:has-text("...")', 'article:has-text("...")', or '[role="listitem"]:has-text("...")'
+
+HIDDEN ELEMENTS (hover-to-reveal):
+- If a button only appears on hover (e.g. Delete, Edit on list items), use "hover_and_click" action:
+  selector = a broad container selector to hover (e.g. "[class*='item']:has-text('Task Name')", "article:has-text('Task Name')")
+  value = the button selector to click after hovering (e.g. "button:has-text(\\"Edit\\")")
+- Alternative: use "hover" action first, then "click" action for the revealed button.
+
+SUPPORTED ACTIONS:
+navigate, click, fill, assert_text, screenshot, wait, hover, hover_and_click, press, check, uncheck, select_option, drag_and_drop, dblclick, type_into, scroll, clear
+
+- "hover_and_click": selector=element to hover over, value=element to click after hover reveals it
+- "press": value=key name e.g. "Enter", "Tab", "Escape"
+- "check"/"uncheck": for native checkboxes only
+- "select_option": for native <select> only; for custom selects use click+click pattern
+- "drag_and_drop": selector=source, value=target
+- "wait": value=seconds as string e.g. "4"
+- "scroll": selector=element to scroll into view
+- "clear": selector=input to clear
+
+SEVERITY: Critical=auth/core, High=main feature, Medium=secondary, Low=cosmetic.
+"""
+    raw = await _call_openai(prompt)
+    text = _clean_json(raw)
+    parsed = json.loads(text)
+    tests: list[dict[str, Any]] = parsed.get("tests", [])
+    return tests
+
+
+async def analyze_commit_and_generate_tests(
+    commit_sha: str,
+    commit_message: str,
+    diff_text: str,
+    file_contents: str,
+    changed_files: list[str],
+    target_url: str,
+    test_email: str | None = None,
+    test_password: str | None = None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """
+    Given the diff of a specific commit, first understand what user-facing
+    functionality changed, then generate targeted Playwright tests for those changes.
+    Returns (analysis_data, tests_list).
+    """
+    cred_section = ""
+    if test_email and test_password:
+        cred_section = f"""
+REAL TEST CREDENTIALS (use these EXACT values in login fill steps):
+  Email:    {test_email}
+  Password: {test_password}
+"""
+    elif test_email:
+        cred_section = f"""
+REAL TEST CREDENTIALS:
+  Email:    {test_email}
+  Password: (not provided — skip tests that require a password)
+"""
+    else:
+        cred_section = "TEST CREDENTIALS: Not provided. Use placeholder values."
+
+    prompt = f"""You are a senior QA engineer and Playwright automation engineer.
+
+A developer just committed: "{commit_message}" (SHA: {commit_sha[:8]})
+CHANGED FILES: {', '.join(changed_files[:20])}
+
+TARGET APP URL: {target_url}
+{cred_section}
+
+GIT DIFF (what changed):
+{diff_text[:25000]}
+
+CURRENT FILE CONTENTS (after the commit):
+{file_contents[:25000]}
+
+Your task has TWO parts:
+
+PART 1 — UNDERSTAND THE CHANGE
+Analyze what user-facing functionality changed in this commit. Focus on:
+- Which pages/views are affected
+- What new features or bug fixes were introduced
+- What user interactions are affected
+
+PART 2 — GENERATE TARGETED PLAYWRIGHT TESTS
+Generate 4–6 targeted Playwright test cases that specifically verify the changed functionality.
+These are REGRESSION tests — confirm the commit's changes work correctly.
+
+Return ONLY valid JSON (no markdown, no explanation):
+{{
+  "analysis": {{
+    "summary": "One paragraph: what this commit changes from a user's perspective",
+    "tech_stack": "Technology stack of the app",
+    "pages": [
+      {{
+        "name": "Page name",
+        "path": "/route",
+        "description": "What changed on this page",
+        "key_elements": ["Element 1", "Element 2"]
+      }}
+    ],
+    "user_flows": [
+      {{
+        "name": "Affected user flow name",
+        "steps": ["Step 1", "Step 2", "Step 3"]
+      }}
+    ]
+  }},
+  "tests": [
+    {{
+      "name": "Descriptive test name targeting the changed functionality",
+      "description": "What specific change this test validates",
+      "page_name": "Page being tested",
+      "severity": "Critical|High|Medium|Low",
+      "steps": [
+        {{"action": "navigate", "selector": null, "value": "/", "description": "Open the app"}},
+        {{"action": "screenshot", "selector": null, "value": null, "description": "Capture initial state"}},
+        {{"action": "fill", "selector": "input[type=\\"email\\"]", "value": "{test_email or 'user@example.com'}", "description": "Enter email"}},
+        {{"action": "fill", "selector": "input[type=\\"password\\"]", "value": "{test_password or 'password'}", "description": "Enter password"}},
+        {{"action": "click", "selector": "button:has-text(\\"Sign In\\")", "value": null, "description": "Sign in"}},
+        {{"action": "wait", "selector": null, "value": "4", "description": "Wait for redirect"}},
+        {{"action": "assert_text", "selector": null, "value": "Expected text after action", "description": "Verify the change works"}},
+        {{"action": "screenshot", "selector": null, "value": null, "description": "Capture final state"}}
+      ]
+    }}
+  ]
+}}
+
+STRICT RULES for tests (all apply from the standard test generation):
+- ALWAYS start each test with "navigate".
+- Include at least 2 "screenshot" steps per test.
+- For login steps, use EXACT credentials provided.
+- After clicking login/submit, add "wait" step of "4" seconds.
+- For Radix UI Select triggers: use [role="combobox"], NOT button:has-text("...").
+- For Radix UI Checkboxes: use [role="checkbox"], NOT input[type="checkbox"].
+- For hover-reveal buttons (opacity-0): use "hover_and_click" action.
+  selector = container to hover, value = button selector to click.
+- CSS attribute values with spaces MUST use double-quotes.
+- severity: Critical=auth/core, High=main feature, Medium=secondary, Low=cosmetic.
+SUPPORTED ACTIONS: navigate, click, fill, assert_text, screenshot, wait, hover, hover_and_click, press, check, uncheck, select_option, drag_and_drop, dblclick, type_into, scroll, clear
+"""
+    raw = await _call_openai(prompt)
+    text = _clean_json(raw)
+    parsed: dict[str, Any] = json.loads(text)
+
+    analysis_data: dict[str, Any] = parsed.get("analysis", {})
+    tests: list[dict[str, Any]] = parsed.get("tests", [])
+    return analysis_data, tests
 
 
 async def prioritize_tests(test_results_summary: list[dict[str, Any]]) -> list[dict[str, Any]]:

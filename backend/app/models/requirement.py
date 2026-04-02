@@ -27,6 +27,7 @@ class PyObjectId(str):
 
 class RequirementCreate(BaseModel):
     text: str = Field(..., min_length=10, description="Raw requirement text")
+    instructions: Optional[str] = Field(default=None, description="Optional custom test case generation instructions")
 
 class RequirementDB(BaseModel):
     id: Optional[PyObjectId] = Field(default=None, alias="_id")

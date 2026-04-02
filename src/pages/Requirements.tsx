@@ -11,6 +11,7 @@ const exampleRequirement = "Truck sends engine health data to fleet platform eve
 
 const Requirements = () => {
   const [requirement, setRequirement] = useState("");
+  const [instructions, setInstructions] = useState("");
   const navigate = useNavigate();
   const analyzeMutation = useAnalyzeRequirement();
 
@@ -19,7 +20,7 @@ const Requirements = () => {
   const handleGenerate = async () => {
     if (!requirement.trim()) return;
     try {
-      const result = await analyzeMutation.mutateAsync(requirement);
+      const result = await analyzeMutation.mutateAsync({ text: requirement, instructions });
       localStorage.setItem("lastRequirementId", result.id);
       navigate("/generated-tests");
     } catch {
@@ -35,34 +36,46 @@ const Requirements = () => {
           <div className="h-9 w-9 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 font-display font-bold text-primary text-sm">1</div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="font-display font-semibold text-sm">Step 1 of 4 — Enter Your Requirement</span>
+              <span className="font-display font-semibold text-sm">Step 1 of 4 — Submit Requirement</span>
               <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/10">Start Here</Badge>
             </div>
-            <p className="text-xs text-muted-foreground">Describe what your software does in plain English. The AI will automatically generate a full set of test cases covering functional, edge, API, failure, and regression scenarios.</p>
+            <p className="text-xs text-muted-foreground">Provide a software requirement in plain language. The AI engine will automatically generate a complete test suite covering functional, edge case, API validation, failure, and regression scenarios.</p>
           </div>
           <div className="hidden sm:flex items-center gap-1 text-muted-foreground/40 text-xs shrink-0">
-            <span>→ Step 2: Review Tests</span>
-            <span>→ Step 3: Run</span>
+            <span>→ Step 2: Review Test Suite</span>
+            <span>→ Step 3: Execute</span>
             <span>→ Step 4: Prioritize</span>
           </div>
         </div>
 
         <div className="mb-6">
           <h1 className="text-2xl font-display font-bold mb-1">Requirement Analysis</h1>
-          <p className="text-muted-foreground text-sm">Paste your requirement below — AI will generate comprehensive test cases automatically.</p>
+          <p className="text-muted-foreground text-sm">Submit a software requirement below. The AI engine will generate a comprehensive, structured test suite automatically.</p>
         </div>
 
         <div className="floating-card p-6">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="h-4 w-4 text-primary" />
-            <span className="text-sm font-display font-medium">Requirement Input</span>
+            <span className="text-sm font-display font-medium">Requirement Description</span>
           </div>
 
           <Textarea
             value={requirement}
             onChange={(e) => setRequirement(e.target.value)}
-            placeholder="Describe your software requirement here..."
+            placeholder="Describe the software requirement, system behavior, or feature specification..."
             className="min-h-[180px] bg-muted/30 border-border/50 text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-primary/20 resize-none text-sm font-mono mb-4"
+          />
+
+          <div className="flex items-center gap-2 mb-4 mt-6">
+            <FileText className="h-4 w-4 text-primary" />
+            <span className="text-sm font-display font-medium">Additional Testing Guidance (Optional)</span>
+          </div>
+
+          <Textarea
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            placeholder="e.g. Prioritize API error response validation, or simulate network interruption and offline scenarios..."
+            className="min-h-[80px] bg-muted/30 border-border/50 text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-primary/20 resize-none text-sm font-mono mb-6"
           />
 
           <div className="flex items-center justify-between">
@@ -73,7 +86,7 @@ const Requirements = () => {
               onClick={() => setRequirement(exampleRequirement)}
             >
               <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-              Use example requirement
+              Load Sample Requirement
             </Button>
 
             <Button
@@ -84,12 +97,12 @@ const Requirements = () => {
               {isAnalyzing ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analyzing...
+                  Analyzing Requirement...
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
-                  Generate Test Cases
+                  Generate Test Suite
                 </>
               )}
             </Button>
@@ -108,15 +121,15 @@ const Requirements = () => {
               <div className="h-16 w-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
                 <Sparkles className="h-7 w-7 text-primary" />
               </div>
-              <h3 className="font-display font-semibold mb-2">AI is analyzing your requirement...</h3>
-              <p className="text-sm text-muted-foreground">Generating test cases, identifying edge cases, and preparing synthetic data</p>
-              {analyzeMutation.isError && (
+              <h3 className="font-display font-semibold mb-2">Analyzing requirement and generating test suite...</h3>
+              <p className="text-sm text-muted-foreground">Structuring test cases, identifying edge conditions, and preparing synthetic data configurations</p>
+              {(analyzeMutation as any).isError && (
                 <div className="mt-4 flex items-center gap-2 text-destructive text-sm">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>
-                    {(analyzeMutation.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-                      ?? (analyzeMutation.error as Error)?.message
-                      ?? "Failed to connect to backend. Is the server running on port 8000?"}
+                    {((analyzeMutation as any).error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+                      ?? ((analyzeMutation as any).error as Error)?.message
+                      ?? "Unable to connect to the analysis service. Please verify the server is running on port 8000."}
                   </span>
                 </div>
               )}

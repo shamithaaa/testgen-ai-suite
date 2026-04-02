@@ -131,12 +131,123 @@ export interface DashboardStats {
   weekly_trend: { day: string; passed: number; failed: number; total: number }[];
 }
 
+// ── Repo Analysis & Live Testing Types ────────────────────────────────────────
+
+export interface PageInfo {
+  name: string;
+  path: string;
+  description: string;
+  key_elements: string[];
+}
+
+export interface UserFlow {
+  name: string;
+  steps: string[];
+}
+
+export interface TestStep {
+  action: "navigate" | "click" | "fill" | "assert_text" | "screenshot" | "wait" | "hover" | "hover_and_click" | "press" | "check" | "uncheck" | "select_option" | "drag_and_drop" | "dblclick" | "type_into" | "scroll" | "clear";
+  selector: string | null;
+  value: string | null;
+  description: string;
+}
+
+export interface PlaywrightTestCase {
+  id: string;
+  analysis_id: string;
+  name: string;
+  description: string;
+  page_name: string;
+  severity: string;
+  steps: TestStep[];
+}
+
+export interface CommitInfo {
+  sha: string;
+  short_sha: string;
+  message: string;
+  author: string;
+  relative_date: string;
+  date: string;
+}
+
+export interface RepoAnalysisResult {
+  analysis_id: string;
+  summary: string;
+  tech_stack: string;
+  pages: PageInfo[];
+  user_flows: UserFlow[];
+  tests: PlaywrightTestCase[];
+  // commit mode extras
+  mode?: "full" | "commit";
+  commit_sha?: string;
+  commit_message?: string;
+  changed_files?: string[];
+}
+
+export interface RunSummaryItem {
+  run_id: string;
+  analysis_id: string;
+  status: "running" | "completed" | "failed";
+  total: number;
+  passed: number;
+  failed: number;
+  started_at: string | null;
+  completed_at: string | null;
+  results?: { test_name: string; status: string; duration_ms: number | null }[];
+}
+
+export interface StepResult {
+  step_description: string;
+  screenshot: string | null; // base64 PNG
+  status: "pass" | "fail";
+  error: string | null;
+}
+
+export interface LiveTestResult {
+  test_id: string;
+  test_name: string;
+  status: "pending" | "running" | "passed" | "failed";
+  steps_completed: number;
+  total_steps: number;
+  step_results: StepResult[];
+  error: string | null;
+  duration_ms: number | null;
+}
+
+export interface AnalysisJob {
+  job_id: string;
+  status: "pending" | "running" | "completed" | "failed";
+  step: "pending" | "cloning" | "extracting" | "analyzing" | "generating" | "completed" | "failed";
+  logs: string[];
+  github_url: string;
+  target_url: string;
+  mode?: "full" | "commit";
+  result: RepoAnalysisResult | null;
+  error: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface LiveRunStatus {
+  run_id: string;
+  analysis_id: string;
+  status: "running" | "completed" | "failed";
+  results: LiveTestResult[];
+  total: number;
+  passed: number;
+  failed: number;
+  started_at: string | null;
+  completed_at: string | null;
+  error: string | null;
+}
+
 // ─── API Functions ─────────────────────────────────────────────────────────
 
 export const api = {
   // Requirements
-  analyzeRequirement: (text: string) =>
-    apiClient.post<AnalyzeRequirementResult>("/requirements", { text }).then((r) => r.data),
+  analyzeRequirement: (text: string, instructions?: string) =>
+    apiClient.post<AnalyzeRequirementResult>("/requirements", { text, instructions }).then((r) => r.data),
 
   listRequirements: () =>
     apiClient.get<Requirement[]>("/requirements").then((r) => r.data),
@@ -155,6 +266,9 @@ export const api = {
         params: { ...(requirementId && { requirement_id: requirementId }), ...(category && { category }) },
       })
       .then((r) => r.data),
+
+  updateTestCase: (tc_id: string, payload: Partial<TestCase>) =>
+    apiClient.put<TestCase>(`/test-cases/${tc_id}`, payload).then((r) => r.data),
 
   // Test Execution
   runTests: (payload: {
@@ -210,4 +324,56 @@ export const api = {
   // Dashboard
   getDashboardStats: () =>
     apiClient.get<DashboardStats>("/dashboard/stats").then((r) => r.data),
+
+  // ── Repo Analysis & Live Testing ──────────────────────────────────────────
+  startAnalyzeRepo: (
+    github_url: string,
+    target_url: string,
+    test_email?: string,
+    test_password?: string,
+    test_preferences?: string,
+    mode?: "full" | "commit",
+    commit_sha?: string,
+    commit_message?: string,
+  ) =>
+    apiClient
+      .post<{ job_id: string; status: string; mode: string }>("/repo/analyze", {
+        github_url,
+        target_url,
+        ...(test_email && { test_email }),
+        ...(test_password && { test_password }),
+        ...(test_preferences && { test_preferences }),
+        mode: mode ?? "full",
+        ...(commit_sha && { commit_sha }),
+        ...(commit_message && { commit_message }),
+      })
+      .then((r) => r.data),
+
+  getRepoCommits: (github_url: string) =>
+    apiClient
+      .post<{ commits: CommitInfo[] }>("/repo/commits", { github_url })
+      .then((r) => r.data),
+
+  getAnalysisJob: (jobId: string) =>
+    apiClient.get<AnalysisJob>(`/repo/jobs/${jobId}`).then((r) => r.data),
+
+  getRepoTests: (analysisId: string) =>
+    apiClient.get<PlaywrightTestCase[]>(`/repo/analyses/${analysisId}/tests`).then((r) => r.data),
+
+  executeRepoTests: (analysisId: string) =>
+    apiClient
+      .post<{ run_id: string; total: number; status: string }>(`/repo/analyses/${analysisId}/execute`)
+      .then((r) => r.data),
+
+  getLiveRunStatus: (runId: string) =>
+    apiClient.get<LiveRunStatus>(`/repo/execution/${runId}`).then((r) => r.data),
+
+  listRunHistory: () =>
+    apiClient.get<{ runs: RunSummaryItem[] }>("/repo/runs").then((r) => r.data),
+
+  getRunDetail: (runId: string) =>
+    apiClient.get<LiveRunStatus>(`/repo/runs/${runId}`).then((r) => r.data),
+
+  updatePlaywrightTest: (test_id: string, data: Partial<PlaywrightTestCase>) =>
+    apiClient.put<PlaywrightTestCase>(`/repo/tests/${test_id}`, data).then((r) => r.data),
 };

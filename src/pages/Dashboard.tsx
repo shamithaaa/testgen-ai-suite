@@ -45,10 +45,10 @@ const Dashboard = () => {
   const kpis = [
     { label: "Total Test Cases", value: totalTests, icon: TestTubes, change: "+12%", up: true, color: "text-primary" },
     { label: "Pass Rate", value: `${successRate}%`, icon: TrendingUp, change: "+3.2%", up: true, color: "text-success" },
-    { label: "Failed Tests", value: failed, icon: XCircle, change: "-2", up: false, color: "text-destructive" },
-    { label: "Avg Duration", value: `${avgDuration}s`, icon: Clock, change: "-0.4s", up: false, color: "text-warning" },
+    { label: "Failed Executions", value: failed, icon: XCircle, change: "-2", up: false, color: "text-destructive" },
+    { label: "Avg. Execution Time", value: `${avgDuration}s`, icon: Clock, change: "-0.4s", up: false, color: "text-warning" },
     { label: "Known Failures", value: knownFailures, icon: AlertTriangle, change: "0", up: false, color: "text-destructive" },
-    { label: "High Priority", value: highPriority, icon: Target, change: "+1", up: true, color: "text-warning" },
+    { label: "High Priority Items", value: highPriority, icon: Target, change: "+1", up: true, color: "text-warning" },
   ];
 
   // Weekly trend — use real data or fall back to static mock
@@ -111,11 +111,11 @@ const Dashboard = () => {
               <Activity className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-display font-bold">Dashboard</h1>
+              <h1 className="text-3xl font-display font-bold">Intelligence Dashboard</h1>
               <p className="text-muted-foreground text-sm">
                 {isError
-                  ? "Showing cached mock data — backend unreachable"
-                  : "Live overview of your test intelligence platform"}
+                  ? "Live data unavailable — displaying cached reference data"
+                  : "Real-time overview of your quality assurance intelligence platform"}
               </p>
             </div>
           </div>
@@ -125,34 +125,34 @@ const Dashboard = () => {
         <div className="floating-card p-6 mb-8 border-primary/20">
           <div className="flex items-center gap-2 mb-5">
             <Zap className="h-4 w-4 text-primary" />
-            <h2 className="font-display font-semibold text-sm">How It Works — Follow These 4 Steps</h2>
-            <Badge variant="secondary" className="ml-auto text-xs">Start here</Badge>
+            <h2 className="font-display font-semibold text-sm">Guided Workflow — Four Steps to Full Coverage</h2>
+            <Badge variant="secondary" className="ml-auto text-xs">Begin here</Badge>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               {
                 step: 1, icon: FileText, color: "bg-primary/10 border-primary/20 text-primary",
-                title: "Enter Requirement",
-                desc: "Paste any software requirement in plain English. AI will read it and generate full test cases for you.",
-                url: "/requirements", cta: "Go to Step 1",
+                title: "Submit Requirement",
+                desc: "Provide a software requirement in plain language. The AI engine analyzes the input and generates a structured test suite covering all critical scenarios.",
+                url: "/requirements", cta: "Proceed to Step 1",
               },
               {
                 step: 2, icon: TestTubes, color: "bg-secondary/10 border-secondary/20 text-secondary",
-                title: "Review Test Cases",
-                desc: "See the generated tests grouped by type — functional, edge cases, API, failure, and regression.",
-                url: "/generated-tests", cta: "Go to Step 2",
+                title: "Review Test Suite",
+                desc: "Inspect the AI-generated test suite, organized by category — functional, edge cases, API validation, failure scenarios, and regression.",
+                url: "/generated-tests", cta: "Proceed to Step 2",
               },
               {
                 step: 3, icon: Play, color: "bg-success/10 border-success/20 text-success",
-                title: "Run the Tests",
-                desc: "Execute all tests with one click. See which pass or fail with timing and result breakdown.",
-                url: "/test-execution", cta: "Go to Step 3",
+                title: "Execute Test Suite",
+                desc: "Run the complete test suite with a single action. Results are presented with pass/fail status, execution timing, and a detailed breakdown.",
+                url: "/test-execution", cta: "Proceed to Step 3",
               },
               {
                 step: 4, icon: ArrowUpDown, color: "bg-warning/10 border-warning/20 text-warning",
-                title: "View Priority Ranking",
-                desc: "AI ranks tests by risk and failure history so you fix the most critical issues first.",
-                url: "/prioritization", cta: "Go to Step 4",
+                title: "Risk-Based Prioritization",
+                desc: "Tests are ranked by failure history and risk exposure, enabling teams to resolve the highest-impact defects with precision and efficiency.",
+                url: "/prioritization", cta: "Proceed to Step 4",
               },
             ].map((s, i) => (
               <motion.div
@@ -210,9 +210,9 @@ const Dashboard = () => {
           <div className="lg:col-span-2 floating-card p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-display font-semibold text-sm flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-primary" /> Weekly Test Trend
+                <BarChart3 className="h-4 w-4 text-primary" /> Weekly Execution Trend
               </h3>
-              <Badge variant="secondary" className="bg-muted text-muted-foreground text-xs">Last 7 days</Badge>
+              <Badge variant="secondary" className="bg-muted text-muted-foreground text-xs">Past 7 days</Badge>
             </div>
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={weeklyTrend}>
@@ -243,7 +243,7 @@ const Dashboard = () => {
           {/* Test Category Distribution */}
           <div className="floating-card p-5">
             <h3 className="font-display font-semibold text-sm mb-4 flex items-center gap-2">
-              <Layers className="h-4 w-4 text-secondary" /> Test Categories
+              <Layers className="h-4 w-4 text-secondary" /> Test Category Distribution
             </h3>
             <ResponsiveContainer width="100%" height={170}>
               <PieChart>
@@ -272,7 +272,7 @@ const Dashboard = () => {
           {/* Severity Breakdown */}
           <div className="floating-card p-5">
             <h3 className="font-display font-semibold text-sm mb-4 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-warning" /> Severity Breakdown
+              <AlertTriangle className="h-4 w-4 text-warning" /> Severity Distribution
             </h3>
             <div className="space-y-3">
               {severityBreakdown.map((s) => (
@@ -325,7 +325,7 @@ const Dashboard = () => {
           {/* Quick Stats & Activity */}
           <div className="floating-card p-5">
             <h3 className="font-display font-semibold text-sm mb-4 flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" /> Recent Activity
+              <Zap className="h-4 w-4 text-primary" /> Recent Execution Activity
             </h3>
             <div className="space-y-3">
               {recentActivity.map((t, i) => (
@@ -357,22 +357,22 @@ const Dashboard = () => {
           <div className="floating-card p-5 text-center">
             <Zap className="h-5 w-5 text-primary mx-auto mb-2" />
             <span className="text-3xl font-display font-bold text-gradient block">{totalTests}</span>
-            <span className="text-xs text-muted-foreground">Tests Generated</span>
+            <span className="text-xs text-muted-foreground">Test Cases Generated</span>
           </div>
           <div className="floating-card p-5 text-center">
             <Activity className="h-5 w-5 text-success mx-auto mb-2" />
             <span className="text-3xl font-display font-bold text-gradient block">{activeVehicles}</span>
-            <span className="text-xs text-muted-foreground">Active Vehicles</span>
+            <span className="text-xs text-muted-foreground">Active Monitored Assets</span>
           </div>
           <div className="floating-card p-5 text-center">
             <BarChart3 className="h-5 w-5 text-secondary mx-auto mb-2" />
             <span className="text-3xl font-display font-bold text-gradient block">{stats ? Object.values(stats.test_case_counts).reduce((a, b) => a + b, 0) : mockSyntheticData.length}</span>
-            <span className="text-xs text-muted-foreground">Data Records</span>
+            <span className="text-xs text-muted-foreground">Synthetic Data Records</span>
           </div>
           <div className="floating-card p-5 text-center">
             <Target className="h-5 w-5 text-warning mx-auto mb-2" />
             <span className="text-3xl font-display font-bold text-gradient block">{highPriority}</span>
-            <span className="text-xs text-muted-foreground">Priority Alerts</span>
+            <span className="text-xs text-muted-foreground">High-Priority Alerts</span>
           </div>
         </div>
       </motion.div>
