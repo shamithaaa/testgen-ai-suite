@@ -22,9 +22,9 @@ const Landing = () => {
       <nav className="flex items-center justify-between px-8 py-5 relative z-10">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-background border border-border/50 flex items-center justify-center overflow-hidden p-1">
-            <img src="/logo.png" alt="TestSphere logo" className="h-full w-full object-contain scale-125" />
+            <img src="/logo.png" alt="SDLC logo" className="h-full w-full object-contain scale-125" />
           </div>
-          <span className="font-display font-bold text-lg">TestSphere</span>
+          <span className="font-display font-bold text-lg">SDLC</span>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -63,7 +63,7 @@ const Landing = () => {
           </div>
 
           <h1 className="text-5xl md:text-7xl font-display font-bold leading-tight mb-6">
-            <span className="text-gradient">TestSphere</span>
+            <span className="text-gradient">SDLC</span>
             <br />
             Intelligent Test Generation
             <br />

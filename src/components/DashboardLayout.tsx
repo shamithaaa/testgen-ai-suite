@@ -16,9 +16,9 @@ const DashboardLayout = () => {
               <div className="h-5 w-px bg-border" />
               <div className="flex items-center gap-2">
                 <div className="h-7 w-7 rounded-md bg-background border border-border/50 flex items-center justify-center overflow-hidden p-1">
-                  <img src="/logo.png" alt="TestSphere logo" className="h-full w-full object-contain scale-125" />
+                  <img src="/logo.png" alt="SDLC logo" className="h-full w-full object-contain scale-125" />
                 </div>
-                <span className="font-display font-semibold text-sm">TestSphere</span>
+                <span className="font-display font-semibold text-sm">SDLC</span>
               </div>
             </div>
             <div className="flex items-center gap-3">

@@ -66,13 +66,13 @@ export function AppSidebar() {
           <div className="h-9 w-9 rounded-lg bg-background border border-border/50 flex items-center justify-center flex-shrink-0 overflow-hidden p-1">
             <img
               src="/logo.png"
-              alt="TestSphere logo"
+              alt="SDLC logo"
               className="h-full w-full object-contain scale-125"
             />
           </div>
           {!collapsed && (
             <div>
-              <h2 className="font-display font-bold text-sm text-foreground">TestSphere</h2>
+              <h2 className="font-display font-bold text-sm text-foreground">SDLC</h2>
               <p className="text-[10px] text-muted-foreground">AI-Powered SDLC Platform</p>
             </div>
           )}
