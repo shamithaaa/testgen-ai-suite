@@ -6,7 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import connect_db, close_db
-from app.routes import requirements, test_cases, test_execution, synthetic_data, prioritization, dashboard, repo_analysis
+from app.routes import (
+    requirements, test_cases, test_execution, synthetic_data,
+    prioritization, dashboard, repo_analysis,
+    github, jira, ci_intelligence, defect_prediction, release_gate,
+    monitoring, incidents, sprint,
+)
 
 
 @asynccontextmanager
@@ -18,8 +23,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="TestGen AI Suite API",
-    description="AI-powered test generation, execution, and prioritization backend.",
-    version="1.0.0",
+    description="AI-powered SDLC & Data Quality platform backend.",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -35,6 +40,8 @@ app.add_middleware(
 
 # Register all routers under /api prefix
 API_PREFIX = "/api"
+
+# Existing routes
 app.include_router(requirements.router, prefix=API_PREFIX)
 app.include_router(test_cases.router, prefix=API_PREFIX)
 app.include_router(test_execution.router, prefix=API_PREFIX)
@@ -43,10 +50,20 @@ app.include_router(prioritization.router, prefix=API_PREFIX)
 app.include_router(dashboard.router, prefix=API_PREFIX)
 app.include_router(repo_analysis.router, prefix=API_PREFIX)
 
+# New SDLC Intelligence routes
+app.include_router(github.router, prefix=API_PREFIX)
+app.include_router(jira.router, prefix=API_PREFIX)
+app.include_router(ci_intelligence.router, prefix=API_PREFIX)
+app.include_router(defect_prediction.router, prefix=API_PREFIX)
+app.include_router(release_gate.router, prefix=API_PREFIX)
+app.include_router(monitoring.router, prefix=API_PREFIX)
+app.include_router(incidents.router, prefix=API_PREFIX)
+app.include_router(sprint.router, prefix=API_PREFIX)
+
 
 @app.get("/", tags=["Health"])
 async def root():
-    return {"status": "ok", "service": "TestGen AI Suite API"}
+    return {"status": "ok", "service": "TestGen AI Suite API", "version": "2.0.0"}
 
 
 @app.get("/health", tags=["Health"])

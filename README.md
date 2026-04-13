@@ -1,138 +1,139 @@
-# TestSphere (TestGen AI Suite)
+# SDLC Intelligence Walkthrough (client-friendly)
 
-## 1) Summary (non-technical)
+This section explains the **SDLC Intelligence** pages in the sidebar.
 
-TestSphere is a guided QA workspace that helps teams go from “what we want to build” to “what we should test” and “what we should fix first”.
+If you want a 5-year-old explanation:
+- Building software is like building a big LEGO city.
+- SDLC Intelligence is like having **helper friends** who:
+  - read your plan,
+  - check your LEGO pieces,
+  - warn you before the city opens,
+  - and watch the city after it opens.
 
-At a high level it helps you:
+### The pages (in the same order as the sidebar)
 
-- Turn a plain-English requirement into a complete test suite.
-- Run those tests using realistic data (either your own file or AI-generated data).
-- See results clearly (pass/fail, timing, trends).
-- Prioritize what to address first using risk ranking.
-- Optionally generate and run real browser-based tests against a live app (Live Test Runner).
+1) **Requirements Intel** — “Make the plan clear”
 
-The left sidebar (navbar) is the main navigation. It’s designed as a step-by-step workflow so non-technical users can follow it without needing to understand the implementation.
+**What it does**
+- Takes a feature description (a story of what you want to build) and turns it into clear “rules” that can be tested.
+- Points out confusing parts and asks the missing questions.
 
-More walkthroughs (plain-English):
+**What we want to do**
+- Make sure everyone agrees on what “done” means before building.
+- Reduce misunderstandings early.
 
-- Welcome & Dashboard: [README_WELCOME_AND_DASHBOARD.md](README_WELCOME_AND_DASHBOARD.md)
-- Live Test Runner: [README_LIVE_TEST_RUNNER.md](README_LIVE_TEST_RUNNER.md)
-- Workflow & Synthetic Data: [README_WORKFLOW_AND_SYNTHETIC_DATA.md](README_WORKFLOW_AND_SYNTHETIC_DATA.md)
+**Impact**
+- Fewer surprises later.
+- Fewer last-minute changes because the requirement was unclear.
 
----
+**Example**
+- If the story says: “Users should log in fast”, the helper asks: “How fast is fast?” and writes testable rules like “Login should finish within 2 seconds.”
 
-## 2) Dashboard (start here)
+2) **Code Review** — “Check the changes before you glue them in”
 
-**What it is**
-- The “mission control” page that summarizes quality status at a glance.
-- It shows key numbers like total tests, pass rate, failures, and trends.
-- It includes a guided workflow panel that tells you what to do next.
+**What it does**
+- Looks at a change set (what someone changed) and gives a review: what looks good, what looks risky, what might be missing.
 
-**Why we use it**
-- It answers: “Are we healthy right now?”
-- It reduces time spent searching for the next action.
-- It helps first-time users understand the platform flow quickly.
+**What we want to do**
+- Catch mistakes while they are still small and easy to fix.
+- Encourage safer, cleaner changes.
 
-**How to use it**
-- If you are new: click the guided workflow cards to start Step 1.
-- If you already run tests regularly: use it to confirm whether quality is improving or degrading.
+**Impact**
+- Less time fixing bugs later.
+- Better quality with the same team size.
 
----
+**Example**
+- “You added a new button, but you didn’t say what happens if the user clicks it twice. Add a rule so it doesn’t create duplicates.”
 
-## 3) Live Test Runner (real app, real browser tests)
+3) **CI/CD Intelligence** — “How healthy is the testing robot?”
 
-**What it is**
-- A screen that can automatically create end-to-end (E2E) tests for a real application and run them in a browser.
-- You provide:
-  - a GitHub repository link (so the system can understand how the app is built), and
-  - a running URL (so it can actually test the app you’re seeing).
-- It then:
-  - figures out key screens and user journeys,
-  - generates a set of browser test cases,
-  - runs them and shows results including step-by-step screenshots.
+**What it does**
+- Watches your automatic checks over time and shows:
+  - how often they succeed,
+  - where they fail,
+  - and simple explanations for failures.
 
-**Why we use it**
-- The workflow pages (Requirements → Test Suite → Execution → Ranking) are great for requirement coverage.
-- Live Test Runner is great for “does the app actually work end-to-end in the browser?”
-- Together, they connect intent (requirements) with reality (UI behavior).
+**What we want to do**
+- Understand failures quickly instead of guessing.
+- Spot “sometimes it fails, sometimes it passes” behavior early.
 
-**When to use it**
-- When you want confidence in real user flows (login, create/update flows, navigation, forms).
-- When you want quick E2E coverage on a new app or a specific change.
+**Impact**
+- Faster fixes.
+- More trust that “green = safe” and “red = not safe”.
 
----
+**Example**
+- “It failed because something it needed was missing today (like a missing ingredient). Fix: add the ingredient or pin the version.”
 
-## 4) Navbar walkthrough (in order)
+4) **Defect Prediction** — “Which LEGO piece breaks most?”
 
-This section follows the sidebar order so you can navigate page-by-page.
+**What it does**
+- Finds files/areas that change a lot and often need fixes, and marks them as higher risk.
 
-### Dashboard
-The overview page described above.
+**What we want to do**
+- Know where to focus extra testing and extra careful review.
 
-### Step 1 — Requirements
-Write (or paste) a feature requirement in plain language.
+**Impact**
+- You spend time on the parts most likely to cause problems.
+- Fewer bugs escape into the real world.
 
-**Why it exists**
-- It gives the system the same input a product team already has.
-- It reduces the effort of turning requirements into test coverage.
+**Example**
+- “This payments/checkout area changed many times and had many ‘fix’ changes → test checkout first.”
 
-### Step 2 — Test Suite
-Review the generated tests grouped by common QA categories (functional, edge cases, integration checks, failure scenarios, regression).
+5) **Release Gate** — “Should we open the doors today?”
 
-**Why it exists**
-- AI gives speed and breadth; humans provide accuracy and context.
-- Editing here makes the suite reflect your actual product language.
+**What it does**
+- Gives a simple decision before shipping:
+  - **GO** (safe to ship),
+  - **CONDITIONAL** (ship only if you fix a few things),
+  - **NO-GO** (do not ship yet).
+- Explains the biggest blocker in plain language.
 
-### Step 3 — Test Execution
-Run the suite and watch results arrive.
+**What we want to do**
+- Prevent shipping when it’s obviously unsafe.
+- Make the release decision clear and consistent.
 
-You can choose a data approach:
-- Use an existing dataset file you already trust.
-- Specify the columns you want and let AI create realistic rows.
-- Let the system choose the data context automatically for a fast first run.
+**Impact**
+- Fewer emergency rollbacks.
+- Fewer “we shipped and immediately broke something.”
 
-**Why it exists**
-- Tests without data aren’t realistic.
-- Different teams have different readiness (some have files, some don’t).
+**Example**
+- “NO-GO: many important checks are failing and there are still critical bugs open.”
 
-### Step 4 — Risk Ranking
-See which issues/tests deserve attention first.
+6) **Monitoring** — “Watch the city after it opens”
 
-**Why it exists**
-- Teams usually can’t fix everything at once.
-- Ranking helps focus on the most severe and most likely-to-fail areas.
+**What it does**
+- Watches quality scores over days.
+- Spots sudden drops (things that look unusual).
+- When something looks wrong, it can trigger an **investigation** and suggest what might have caused it.
 
-### Synthetic Data
-Generate realistic “safe” test datasets when you don’t have production data (or you shouldn’t use it).
+**What we want to do**
+- Find problems quickly, close to when they start.
+- Know where to look first when something feels off.
 
-**Why it exists**
-- Data is often the blocker for testing.
-- Synthetic data accelerates early-stage testing and demos.
+**Impact**
+- Less time spent guessing.
+- Smaller problems (caught early) instead of big outages (caught late).
 
-### Live Test Runner
-The real-browser testing capability described above.
+**Example**
+- “Today the data suddenly has many duplicates. Investigation hint: a recent change may be sending the same record twice.”
 
----
+7) **Sprint Intelligence** — “How did we do this week?”
 
-## Appendix (optional): developer quick start
+**What it does**
+- Summarizes how the work period went:
+  - what got done,
+  - what looked risky or unclear,
+  - and how healthy the team’s delivery signals look.
 
-If you’re running the app locally for development, these are the minimal steps.
+**What we want to do**
+- Give a simple story of progress and health.
+- Help decide what to improve next.
 
-Start backend:
+**Impact**
+- Less manual status reporting.
+- Clear next actions (for example: “stabilize checks” or “clarify requirements earlier”).
 
-```bash
-cd backend
-source .venv/bin/activate
-uvicorn main:app --reload
-```
-
-Start frontend:
-
-```bash
-cd ..
-npm install
-npm run dev
-```
+**Example**
+- “We finished many stories, but the automatic checks failed often → next sprint, focus on making checks stable.”
 
 

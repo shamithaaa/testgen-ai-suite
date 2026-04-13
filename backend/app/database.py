@@ -5,20 +5,25 @@ from app.config import settings
 _client: AsyncIOMotorClient | None = None
 
 
+def _make_client() -> AsyncIOMotorClient:
+    uri = settings.MONGODB_URI
+    kwargs: dict = {"serverSelectionTimeoutMS": 10000}
+    # Only attach TLS CA bundle for Atlas (SRV) connections
+    if uri.startswith("mongodb+srv://"):
+        kwargs["tlsCAFile"] = certifi.where()
+    return AsyncIOMotorClient(uri, **kwargs)
+
+
 async def connect_db() -> None:
     global _client
-    _client = AsyncIOMotorClient(
-        settings.MONGODB_URI,
-        tlsCAFile=certifi.where(),
-        serverSelectionTimeoutMS=10000,
-    )
-    # Ping to verify connection — non-fatal so the server can still start
     try:
+        _client = _make_client()
         await _client.admin.command("ping")
         print(f"[DB] Connected to MongoDB at {settings.MONGODB_URI}")
     except Exception as exc:
-        print(f"[DB] WARNING: MongoDB ping failed ({exc}). "
+        print(f"[DB] WARNING: MongoDB connection failed ({exc}). "
               "Server will start anyway — DB calls will fail until the connection is available.")
+        _client = None
 
 
 async def close_db() -> None:
@@ -30,11 +35,6 @@ async def close_db() -> None:
 
 def get_db() -> AsyncIOMotorDatabase:
     global _client
-    # Lazy-init for serverless environments where lifespan may not have run
     if _client is None:
-        _client = AsyncIOMotorClient(
-            settings.MONGODB_URI,
-            tlsCAFile=certifi.where(),
-            serverSelectionTimeoutMS=10000,
-        )
+        _client = _make_client()
     return _client[settings.MONGODB_DB]

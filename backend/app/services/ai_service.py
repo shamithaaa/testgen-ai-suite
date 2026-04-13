@@ -29,16 +29,18 @@ def _is_quota_error(exc: Exception) -> bool:
     return isinstance(exc, RateLimitError) or "429" in str(exc) or "quota" in str(exc).lower()
 
 
-def _call_openai_sync(prompt: str) -> str:
+def _call_openai_sync(prompt: str, json_mode: bool = True) -> str:
     """Synchronous Azure OpenAI chat completion with up to 3 retries on 429."""
     delays = [5, 15, 30]
+    kwargs: dict = {
+        "model": _DEPLOYMENT,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if json_mode:
+        kwargs["response_format"] = {"type": "json_object"}
     for attempt, delay in enumerate(delays, 1):
         try:
-            response = _client.chat.completions.create(
-                model=_DEPLOYMENT,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"},
-            )
+            response = _client.chat.completions.create(**kwargs)
             return response.choices[0].message.content or ""
         except Exception as exc:
             if _is_quota_error(exc):
@@ -53,9 +55,9 @@ def _call_openai_sync(prompt: str) -> str:
             raise  # non-429 errors bubble up immediately
 
 
-async def _call_openai(prompt: str) -> str:
+async def _call_openai(prompt: str, json_mode: bool = True) -> str:
     """Async wrapper — runs the sync call in a thread so the event loop isn't blocked."""
-    return await asyncio.to_thread(_call_openai_sync, prompt)
+    return await asyncio.to_thread(_call_openai_sync, prompt, json_mode)
 
 # --------------------------------------------------------------------------
 
@@ -565,3 +567,233 @@ Base priority on: failure frequency, severity, recent failures, and potential im
     parsed = json.loads(text)
     ranked: list[dict[str, Any]] = parsed if isinstance(parsed, list) else parsed.get("results", list(parsed.values())[0])
     return ranked
+
+
+# ─── NEW: SDLC Intelligence prompts ────────────────────────────────────────
+
+
+async def review_pull_request(pr_title: str, pr_body: str, files: list[dict]) -> dict[str, Any]:
+    """
+    AI code review for a GitHub pull request.
+    Returns structured findings and a PR summary.
+    """
+    diff_text = "\n\n".join(
+        f"=== {f['filename']} (+{f['additions']} -{f['deletions']}) ===\n{f.get('patch', '')[:3000]}"
+        for f in files[:15]
+    )
+    prompt = f"""You are a senior software engineer performing a thorough code review.
+
+PR TITLE: {pr_title}
+PR DESCRIPTION: {pr_body[:1000]}
+
+DIFF:
+{diff_text[:20000]}
+
+Analyse every file in the diff and return structured findings.
+
+Return ONLY valid JSON (no markdown) with exactly this shape:
+{{
+  "summary": {{
+    "overall_risk": "low|medium|high|critical",
+    "what_changed": "1–2 sentence description",
+    "test_coverage_estimate": "string (e.g. 'No tests included', 'Unit tests added for 3 functions')",
+    "review_recommendation": "APPROVE|REQUEST_CHANGES|NEEDS_DISCUSSION"
+  }},
+  "findings": [
+    {{
+      "file": "relative/file/path.ts",
+      "line": 42,
+      "severity": "critical|high|medium|low",
+      "category": "security|bug|performance|style|test-coverage|maintainability",
+      "message": "Clear description of the issue",
+      "suggestion": "Concrete fix or improvement"
+    }}
+  ],
+  "security_flags": ["string"],
+  "positive_observations": ["string"]
+}}
+
+Focus on: SQL injection, XSS, null dereferences, missing error handling, hardcoded secrets,
+N+1 queries, missing input validation, unhandled promises, race conditions.
+Return JSON only."""
+    raw = await _call_openai(prompt)
+    return json.loads(_clean_json(raw))
+
+
+async def explain_ci_failure(step: str, error_message: str, stack_trace: str, repo_language: str) -> dict[str, Any]:
+    """Explain a CI/CD build failure in plain English."""
+    prompt = f"""You are a DevOps engineer. A CI build failed.
+
+Repository language: {repo_language}
+Failed step: {step}
+Error message: {error_message[:2000]}
+Stack trace (first 10 lines):
+{stack_trace[:3000]}
+
+Return ONLY valid JSON:
+{{
+  "explanation": "2–3 sentence plain-English explanation of what went wrong",
+  "fix": "One concrete actionable fix",
+  "category": "test|build|dependency|environment|flaky|lint|timeout",
+  "confidence": 0.85,
+  "is_flaky_candidate": false
+}}"""
+    raw = await _call_openai(prompt)
+    return json.loads(_clean_json(raw))
+
+
+async def generate_defect_risk_narrative(top_risk_files: list[dict]) -> str:
+    """Write a risk summary narrative for the top high-risk files."""
+    prompt = f"""You are a software engineering lead reviewing code quality metrics.
+These are the top highest-risk files in the repository based on change frequency,
+bug-fix association, code churn, and author diversity:
+
+{json.dumps(top_risk_files, indent=2)[:8000]}
+
+Write a 3-paragraph risk summary for an engineering manager:
+1. Which files need immediate attention and why
+2. Pattern analysis — are these in the same module? Same author?
+3. Recommended actions (add tests, refactor, code review gate)
+
+Keep it concise and actionable. Plain text, no markdown headers."""
+    raw = await _call_openai(prompt)
+    return raw.strip()
+
+
+async def analyze_release_readiness(
+    version: str,
+    test_pass_rate: float,
+    open_critical_bugs: list[dict],
+    unresolved_security_findings: int,
+    high_risk_files: list[str],
+    score: int,
+) -> dict[str, Any]:
+    """Compute a go/no-go verdict for a release."""
+    bug_titles = [f"{b['key']}: {b['summary']}" for b in open_critical_bugs[:5]]
+    prompt = f"""You are a release manager. Evaluate this release:
+
+Version: {version}
+Test pass rate: {test_pass_rate:.1f}%
+Open critical/high bugs: {len(open_critical_bugs)} ({', '.join(bug_titles) or 'none'})
+Unresolved security findings: {unresolved_security_findings}
+High-risk files changed: {', '.join(high_risk_files[:8]) or 'none'}
+Release readiness score: {score}/100
+
+Return ONLY valid JSON:
+{{
+  "verdict": "GO|NO-GO|CONDITIONAL",
+  "confidence": 0.85,
+  "primary_blocker": "string or null",
+  "recommendation": "2–3 sentence recommendation",
+  "conditions": ["string (only if CONDITIONAL)"]
+}}"""
+    raw = await _call_openai(prompt)
+    return json.loads(_clean_json(raw))
+
+
+async def investigate_incident(
+    anomaly: dict,
+    column_comparison: list[dict],
+    recent_commits: list[str],
+    related_alerts: list[dict],
+) -> dict[str, Any]:
+    """AI root cause analysis for a data quality incident."""
+    prompt = f"""You are an incident response engineer. A data quality anomaly has been detected.
+
+Anomaly: {json.dumps(anomaly)}
+Affected columns (current vs baseline): {json.dumps(column_comparison[:10])}
+Recent commits: {json.dumps(recent_commits[:5])}
+Related alerts: {json.dumps(related_alerts[:5])}
+
+Provide a root cause analysis. Return ONLY valid JSON:
+{{
+  "root_cause": "One sentence most likely root cause",
+  "evidence": ["bullet point 1", "bullet point 2", "bullet point 3"],
+  "immediate_action": "Single most important remediation step",
+  "prevention_action": "How to prevent recurrence",
+  "confidence": 0.80
+}}"""
+    raw = await _call_openai(prompt)
+    return json.loads(_clean_json(raw))
+
+
+async def generate_sprint_summary(sprint_report: dict) -> str:
+    """AI-generated sprint quality summary for an engineering manager."""
+    prompt = f"""You are an engineering manager. Summarise this sprint's quality performance:
+
+{json.dumps(sprint_report, indent=2)[:6000]}
+
+Write an executive summary (3 paragraphs):
+1. What went well (quality wins, story delivery, test coverage)
+2. What needs attention (risks that materialised, production incidents, ambiguous stories)
+3. Recommendations for next sprint
+
+Keep it factual, reference specific story IDs and numbers where present.
+Plain text, no markdown headers, no bullet points — just 3 clean paragraphs."""
+    raw = await _call_openai(prompt, json_mode=False)
+    return raw.strip()
+
+
+async def generate_acceptance_criteria(story: dict, existing_stories: list[dict]) -> dict[str, Any]:
+    """Generate BDD acceptance criteria for a Jira user story."""
+    context = "\n".join(f"- {s['key']}: {s['summary']}" for s in existing_stories[:10])
+    prompt = f"""You are a senior QA engineer and business analyst.
+
+USER STORY:
+Key: {story.get('key', 'N/A')}
+Summary: {story.get('summary', '')}
+Description: {story.get('description', '')[:1500]}
+Priority: {story.get('priority', 'Medium')}
+
+EXISTING STORIES (for duplicate detection):
+{context}
+
+Generate structured acceptance criteria. Return ONLY valid JSON:
+{{
+  "acceptance_criteria": [
+    {{
+      "scenario": "Scenario name",
+      "given": "Given context",
+      "when": "When action",
+      "then": "Then expected outcome"
+    }}
+  ],
+  "ambiguity_flags": [
+    {{
+      "term": "ambiguous term",
+      "question": "specific clarification question"
+    }}
+  ],
+  "risk_score": 65,
+  "risk_reasoning": "why this score",
+  "duplicate_of": "PROJ-123 or null",
+  "test_hints": ["key thing to test 1", "key thing to test 2"]
+}}
+
+Generate 3–5 Given/When/Then scenarios. Flag terms that are undefined or ambiguous."""
+    raw = await _call_openai(prompt)
+    return json.loads(_clean_json(raw))
+
+
+async def generate_predictive_alert(time_series: list[dict], anomalies: list[dict]) -> dict[str, Any]:
+    """Generate a predictive alert message from quality time series data."""
+    prompt = f"""You are a data observability engineer.
+
+30-day quality score time series (last 10 points):
+{json.dumps(time_series[-10:], indent=2)}
+
+Detected anomalies:
+{json.dumps(anomalies, indent=2)[:3000]}
+
+Predict which dimension is at risk in the next 48 hours and write a Slack-ready alert.
+
+Return ONLY valid JSON:
+{{
+  "at_risk_dimension": "completeness|uniqueness|validity|consistency|overall",
+  "predicted_breach_in_hours": 36,
+  "severity": "critical|warning|info",
+  "alert_message": "Slack-ready alert message (2–3 sentences)",
+  "recommended_action": "Specific investigation step"
+}}"""
+    raw = await _call_openai(prompt)
+    return json.loads(_clean_json(raw))

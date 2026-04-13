@@ -376,4 +376,90 @@ export const api = {
 
   updatePlaywrightTest: (test_id: string, data: Partial<PlaywrightTestCase>) =>
     apiClient.put<PlaywrightTestCase>(`/repo/tests/${test_id}`, data).then((r) => r.data),
+
+  // ── GitHub ────────────────────────────────────────────────────────────────
+  getRepoPRs: (owner: string, repo: string) =>
+    apiClient.get("/github/prs", { params: { owner, repo } }).then((r) => r.data as any[]),
+
+  getPRFiles: (owner: string, repo: string, prNumber: number) =>
+    apiClient.get(`/github/pr/${prNumber}/files`, { params: { owner, repo } }).then((r) => r.data as any[]),
+
+  reviewPR: (owner: string, repo: string, prNumber: number) =>
+    apiClient.post(`/github/pr/${prNumber}/review`, null, { params: { owner, repo } }).then((r) => r.data),
+
+  getWorkflowRuns: (owner: string, repo: string) =>
+    apiClient.get("/github/workflow-runs", { params: { owner, repo } }).then((r) => r.data as any[]),
+
+  explainRunFailure: (owner: string, repo: string, runId: number) =>
+    apiClient.post(`/github/workflow-runs/${runId}/explain`, null, { params: { owner, repo } }).then((r) => r.data),
+
+  // ── Jira ──────────────────────────────────────────────────────────────────
+  getJiraProjects: () =>
+    apiClient.get("/jira/projects").then((r) => r.data as any[]),
+
+  getJiraStories: (project: string) =>
+    apiClient.get("/jira/stories", { params: { project } }).then((r) => r.data as any[]),
+
+  analyzeSprintAC: (project: string) =>
+    apiClient.post("/jira/analyze-sprint", { project }).then((r) => r.data),
+
+  analyzeManualStory: (summary: string, description: string, priority: string) =>
+    apiClient.post("/jira/analyze-manual", { summary, description, priority }).then((r) => r.data),
+
+  generateStoryAC: (issueKey: string, project: string) =>
+    apiClient.post(`/jira/stories/${issueKey}/generate-ac`, { project }).then((r) => r.data),
+
+  pushACToJira: (issueKey: string, text: string) =>
+    apiClient.post(`/jira/stories/${issueKey}/update-ac`, { acceptance_criteria_text: text }).then((r) => r.data),
+
+  getJiraBugs: (project: string, version?: string) =>
+    apiClient.get("/jira/bugs", { params: { project, ...(version && { version }) } }).then((r) => r.data as any[]),
+
+  // ── CI Intelligence ───────────────────────────────────────────────────────
+  getCIHealth: (owner: string, repo: string) =>
+    apiClient.get("/ci/health", { params: { owner, repo } }).then((r) => r.data),
+
+  getFlakyTests: (owner: string, repo: string) =>
+    apiClient.get("/ci/flaky-tests", { params: { owner, repo } }).then((r) => r.data),
+
+  explainCIFailure: (owner: string, repo: string, runId: number) =>
+    apiClient.post(`/ci/runs/${runId}/explain`, null, { params: { owner, repo } }).then((r) => r.data),
+
+  // ── Defect Prediction ─────────────────────────────────────────────────────
+  getDefectRiskScores: (owner: string, repo: string, sinceDays: number = 90) =>
+    apiClient.get("/defect-prediction/risk-scores", { params: { owner, repo, since_days: sinceDays } }).then((r) => r.data),
+
+  // ── Release Gate ──────────────────────────────────────────────────────────
+  evaluateRelease: (params: { version: string; owner: string; repo: string; jira_project?: string }) =>
+    apiClient.post("/release-gate/evaluate", params).then((r) => r.data),
+
+  // ── Monitoring ────────────────────────────────────────────────────────────
+  simulateTimeSeries: (baseline: Record<string, number>, days?: number) =>
+    apiClient.post("/monitoring/simulate-time-series", { baseline, days }).then((r) => r.data),
+
+  analyzeTimeSeries: (series: any[]) =>
+    apiClient.post("/monitoring/analyze", { series }).then((r) => r.data),
+
+  // ── Incidents ─────────────────────────────────────────────────────────────
+  createIncident: (data: { anomaly: any; column_comparison?: any[]; recent_commits?: string[]; related_alerts?: any[]; title?: string }) =>
+    apiClient.post("/incidents", data).then((r) => r.data),
+
+  listIncidents: () =>
+    apiClient.get("/incidents").then((r) => r.data as any[]),
+
+  getIncident: (id: string) =>
+    apiClient.get(`/incidents/${id}`).then((r) => r.data),
+
+  resolveIncident: (id: string, note?: string) =>
+    apiClient.put(`/incidents/${id}/resolve`, { note }).then((r) => r.data),
+
+  generatePostmortem: (id: string) =>
+    apiClient.post(`/incidents/${id}/postmortem`).then((r) => r.data),
+
+  // ── Sprint Intelligence ───────────────────────────────────────────────────
+  generateSprintReport: (params: { owner: string; repo: string; jira_project?: string; sprint_name?: string }) =>
+    apiClient.post("/sprint/report", params).then((r) => r.data),
+
+  getDORAMetrics: (owner: string, repo: string) =>
+    apiClient.get("/sprint/dora", { params: { owner, repo } }).then((r) => r.data),
 };
