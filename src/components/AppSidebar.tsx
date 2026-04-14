@@ -14,6 +14,7 @@ import {
   AlertOctagon,
   Gauge,
   Brain,
+  Code2,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -40,17 +41,18 @@ const workflowSteps = [
 const toolItems = [
   { title: "Synthetic Data", url: "/synthetic-data", icon: Database, hint: "AI-generated test datasets" },
   { title: "Live Test Runner", url: "/live-testing", icon: Clapperboard, hint: "Repository → AI → Browser execution" },
+  { title: "AI Workspace", url: "/workspace", icon: Code2, hint: "Code editor + AI Copilot + Git" },
 ];
 
 const sdlcItems = [
   { title: "Requirements Intel", url: "/requirements-intelligence", icon: Brain, hint: "Jira stories + BDD generation" },
   { title: "Code Review", url: "/code-review", icon: GitPullRequest, hint: "AI inline PR review" },
-  { title: "CI/CD Intelligence", url: "/ci-intelligence", icon: Activity, hint: "Build health & flaky test detection" },
+  // { title: "CI/CD Intelligence", url: "/ci-intelligence", icon: Activity, hint: "Build health & flaky test detection" },
   { title: "Defect Prediction", url: "/defect-prediction", icon: Bug, hint: "File risk scoring from git history" },
   { title: "Release Gate", url: "/release-gate", icon: Lock, hint: "Go/no-go release decision" },
   { title: "Monitoring", url: "/monitoring", icon: Gauge, hint: "Anomaly detection & predictive alerts" },
   // { title: "Incidents", url: "/incidents", icon: AlertOctagon, hint: "Root cause AI investigation" },
-  { title: "Sprint Intelligence", url: "/sprint-intelligence", icon: BarChart3, hint: "DORA metrics & sprint summary" },
+  // { title: "Sprint Intelligence", url: "/sprint-intelligence", icon: BarChart3, hint: "DORA metrics & sprint summary" },
 ];
 
 export function AppSidebar() {

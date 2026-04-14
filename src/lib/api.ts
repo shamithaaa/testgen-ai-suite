@@ -242,6 +242,305 @@ export interface LiveRunStatus {
   error: string | null;
 }
 
+// ── AI Workspace Types ─────────────────────────────────────────────────────
+
+export interface FileNode {
+  name: string;
+  path: string;
+  type: "file" | "directory";
+  language?: string;
+  children?: FileNode[];
+}
+
+export interface WorkspaceInfo {
+  workspace_id: string;
+  repo_url: string;
+  branch: string;
+  tree: FileNode[];
+}
+
+export interface WorkspaceFile {
+  path: string;
+  content: string;
+  language: string;
+  size_bytes: number;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface SnippetInfo {
+  name: string;
+  code: string;
+  language: string;
+  tags: string[];
+}
+
+export interface CopilotSuggestion {
+  original: string;
+  modified: string;
+  diff_summary: string;
+  explanation: string;
+  commit_message: string;
+  snippets: SnippetInfo[];
+  confidence: number;
+}
+
+export interface SuggestCodeRequest {
+  workspace_id: string;
+  file_path: string;
+  content: string;
+  instruction: string;
+  history: ChatMessage[];
+  language?: string;
+}
+
+export interface FileSuggestion {
+  file_path: string;
+  original: string;
+  modified: string;
+  summary: string;
+  is_new: boolean;
+}
+
+export interface WorkspaceSuggestRequest {
+  workspace_id: string;
+  instruction: string;
+  history: ChatMessage[];
+  context_files?: string[];
+}
+
+export interface WorkspaceSuggestResponse {
+  files: FileSuggestion[];
+  overall_summary: string;
+  commit_message: string;
+  explanation: string;
+}
+
+export interface AddCommentsRequest {
+  workspace_id: string;
+  file_path: string;
+  content: string;
+  language?: string;
+  style?: string;
+}
+
+export interface ExplainCodeRequest {
+  workspace_id: string;
+  file_path: string;
+  content: string;
+  selection?: string;
+  question?: string;
+}
+
+export interface ExplainCodeResponse {
+  explanation: string;
+  key_points: string[];
+}
+
+export interface SnippetItem {
+  id: string;
+  workspace_id: string;
+  name: string;
+  code: string;
+  language: string;
+  tags: string[];
+  usage_count: number;
+  created_at: string;
+}
+
+export interface CreateSnippetRequest {
+  workspace_id: string;
+  name: string;
+  code: string;
+  language: string;
+  tags: string[];
+}
+
+export interface GitStatus {
+  workspace_id: string;
+  branch: string;
+  staged: string[];
+  unstaged: string[];
+  untracked: string[];
+}
+
+export interface GitLogEntry {
+  sha: string;
+  short_sha: string;
+  message: string;
+  author: string;
+  date: string;
+}
+
+export interface CommitRequest {
+  workspace_id: string;
+  branch: string;
+  files: string[];
+  message: string;
+  author_name?: string;
+  author_email?: string;
+  new_file_contents: Record<string, string>;
+}
+
+export interface CommitResult {
+  sha: string;
+  message: string;
+  branch: string;
+  github_url: string;
+  timestamp: string;
+}
+
+export interface CoverageGap {
+  name: string;
+  type: string;
+  line_start: number;
+  line_end: number;
+  covered: boolean;
+}
+
+export interface CoverageAnalysis {
+  file_path: string;
+  total_functions: number;
+  covered_functions: number;
+  coverage_pct: number;
+  gaps: CoverageGap[];
+}
+
+export interface CoverageAnalyzeRequest {
+  workspace_id: string;
+  file_path: string;
+  content: string;
+}
+
+export interface TestGenerateRequest {
+  workspace_id: string;
+  file_path: string;
+  content: string;
+  gaps: string[];
+  framework?: string;
+  existing_tests?: string;
+}
+
+export interface GeneratedTest {
+  function_name: string;
+  code: string;
+  description: string;
+  gap_covered: string;
+}
+
+export interface TestGenerateResult {
+  test_file_path: string;
+  test_file_content: string;
+  tests: GeneratedTest[];
+}
+
+export interface RunTestsRequest {
+  workspace_id: string;
+  test_file_path: string;
+  test_content: string;
+}
+
+// ── Playwright Test Generation from Workspace Source ──────────────────────
+
+export interface WorkspaceTestStep {
+  action: string;
+  selector: string | null;
+  value: string | null;
+  description: string;
+}
+
+export interface WorkspacePlaywrightTest {
+  id: string;
+  analysis_id: string;
+  name: string;
+  description: string;
+  page_name: string;
+  severity: string;
+  steps: WorkspaceTestStep[];
+}
+
+export interface PlaywrightGenerateRequest {
+  workspace_id: string;
+  file_path: string;
+  content: string;
+  target_url?: string;
+}
+
+export interface PlaywrightGenerateResponse {
+  tests: WorkspacePlaywrightTest[];
+}
+
+export interface PlaywrightExportRequest {
+  workspace_id: string;
+  tests: WorkspacePlaywrightTest[];
+  target_url?: string;
+}
+
+export interface PlaywrightExportResponse {
+  file_path: string;
+  content: string;
+}
+
+export interface TestRunResult {
+  passed: number;
+  failed: number;
+  errors: number;
+  results: { name: string; status: string; duration_ms: number | null; message: string | null }[];
+  output: string;
+}
+
+// ── Batch / App / Commit Playwright Generation ─────────────────────────────
+
+export interface FilePayload {
+  file_path: string;
+  content: string;
+}
+
+export interface PlaywrightBatchGenerateRequest {
+  files: FilePayload[];
+  target_url?: string;
+}
+
+export interface PlaywrightAppGenerateRequest {
+  workspace_id: string;
+  target_url?: string;
+}
+
+export interface PlaywrightCommitGenerateRequest {
+  workspace_id: string;
+  commit_sha: string;
+  target_url?: string;
+}
+
+// ── Saved Test Suites ──────────────────────────────────────────────────────
+
+export interface SaveTestSuiteRequest {
+  workspace_id: string;
+  name: string;
+  scope: "entire_app" | "commits" | "virtual_files" | "single_file";
+  tests: WorkspacePlaywrightTest[];
+  target_url?: string;
+  commit_sha?: string;
+}
+
+export interface TestSuiteInfo {
+  suite_id: string;
+  workspace_id: string;
+  name: string;
+  scope: string;
+  test_count: number;
+  target_url?: string;
+  commit_sha?: string;
+  created_at: string;
+}
+
+export interface TestSuiteFull extends TestSuiteInfo {
+  tests: WorkspacePlaywrightTest[];
+}
+
 // ─── API Functions ─────────────────────────────────────────────────────────
 
 export const api = {
@@ -462,4 +761,99 @@ export const api = {
 
   getDORAMetrics: (owner: string, repo: string) =>
     apiClient.get("/sprint/dora", { params: { owner, repo } }).then((r) => r.data),
+
+  // ── AI Workspace ──────────────────────────────────────────────────────────
+  connectWorkspace: (github_url: string, branch: string, pat?: string) =>
+    apiClient.post<WorkspaceInfo>("/workspace/connect", { github_url, branch, pat }).then((r) => r.data),
+
+  getWorkspaceTree: (workspaceId: string) =>
+    apiClient.get<{ workspace_id: string; tree: FileNode[] }>(`/workspace/${workspaceId}/tree`).then((r) => r.data),
+
+  getWorkspaceFile: (workspaceId: string, path: string) =>
+    apiClient.get<WorkspaceFile>(`/workspace/${workspaceId}/file`, { params: { path } }).then((r) => r.data),
+
+  saveWorkspaceFile: (workspaceId: string, path: string, content: string) =>
+    apiClient.put(`/workspace/${workspaceId}/file`, { content }, { params: { path } }).then((r) => r.data),
+
+  deleteWorkspace: (workspaceId: string) =>
+    apiClient.delete(`/workspace/${workspaceId}`).then((r) => r.data),
+
+  // Copilot
+  suggestCode: (payload: SuggestCodeRequest) =>
+    apiClient.post<CopilotSuggestion>("/copilot/suggest", payload).then((r) => r.data),
+
+  addComments: (payload: AddCommentsRequest) =>
+    apiClient.post<CopilotSuggestion>("/copilot/add-comments", payload).then((r) => r.data),
+
+  explainCode: (payload: ExplainCodeRequest) =>
+    apiClient.post<ExplainCodeResponse>("/copilot/explain", payload).then((r) => r.data),
+
+  suggestWorkspace: (payload: WorkspaceSuggestRequest) =>
+    apiClient.post<WorkspaceSuggestResponse>("/copilot/suggest-workspace", payload).then((r) => r.data),
+
+  getSnippets: (params?: { lang?: string; tag?: string; workspace_id?: string }) =>
+    apiClient.get<SnippetItem[]>("/copilot/snippets", { params }).then((r) => r.data),
+
+  createSnippet: (payload: CreateSnippetRequest) =>
+    apiClient.post<SnippetItem>("/copilot/snippets", payload).then((r) => r.data),
+
+  deleteSnippet: (id: string) =>
+    apiClient.delete(`/copilot/snippets/${id}`).then((r) => r.data),
+
+  // Git
+  getGitStatus: (workspaceId: string) =>
+    apiClient.get<GitStatus>("/git/status", { params: { workspace_id: workspaceId } }).then((r) => r.data),
+
+  getGitLog: (workspaceId: string, maxCount?: number) =>
+    apiClient.get<{ workspace_id: string; commits: GitLogEntry[] }>("/git/log", { params: { workspace_id: workspaceId, max_count: maxCount } }).then((r) => r.data),
+
+  getGitDiff: (workspaceId: string, filePath: string) =>
+    apiClient.get<{ diff: string }>("/git/diff", { params: { workspace_id: workspaceId, file_path: filePath } }).then((r) => r.data),
+
+  createBranch: (payload: { workspace_id: string; branch_name: string; from_branch?: string }) =>
+    apiClient.post("/git/branch", payload).then((r) => r.data),
+
+  commitAndPush: (payload: CommitRequest) =>
+    apiClient.post<CommitResult>("/git/commit", payload).then((r) => r.data),
+
+  // Coverage
+  analyzeCoverage: (payload: CoverageAnalyzeRequest) =>
+    apiClient.post<CoverageAnalysis>("/coverage/analyze", payload).then((r) => r.data),
+
+  // Test Generation
+  generateTests: (payload: TestGenerateRequest) =>
+    apiClient.post<TestGenerateResult>("/tests/generate", payload).then((r) => r.data),
+
+  runTests: (payload: RunTestsRequest) =>
+    apiClient.post<TestRunResult>("/tests/run", payload).then((r) => r.data),
+
+  // Playwright Test Generation from Workspace Source
+  generatePlaywrightTests: (payload: PlaywrightGenerateRequest) =>
+    apiClient.post<PlaywrightGenerateResponse>("/tests/generate-playwright", payload).then((r) => r.data),
+
+  exportPlaywrightTests: (payload: PlaywrightExportRequest) =>
+    apiClient.post<PlaywrightExportResponse>("/tests/export-playwright", payload).then((r) => r.data),
+
+  // Batch / App / Commit Playwright Generation
+  generatePlaywrightBatch: (payload: PlaywrightBatchGenerateRequest) =>
+    apiClient.post<PlaywrightGenerateResponse>("/tests/generate-playwright-batch", payload).then((r) => r.data),
+
+  generatePlaywrightApp: (payload: PlaywrightAppGenerateRequest) =>
+    apiClient.post<PlaywrightGenerateResponse>("/tests/generate-playwright-app", payload).then((r) => r.data),
+
+  generatePlaywrightCommit: (payload: PlaywrightCommitGenerateRequest) =>
+    apiClient.post<PlaywrightGenerateResponse>("/tests/generate-playwright-commit", payload).then((r) => r.data),
+
+  // Saved Test Suites
+  saveTestSuite: (payload: SaveTestSuiteRequest) =>
+    apiClient.post<TestSuiteInfo>("/tests/workspace-suites", payload).then((r) => r.data),
+
+  listTestSuites: (workspace_id: string) =>
+    apiClient.get<TestSuiteInfo[]>("/tests/workspace-suites", { params: { workspace_id } }).then((r) => r.data),
+
+  getTestSuite: (suite_id: string) =>
+    apiClient.get<TestSuiteFull>(`/tests/workspace-suites/${suite_id}`).then((r) => r.data),
+
+  deleteTestSuite: (suite_id: string) =>
+    apiClient.delete(`/tests/workspace-suites/${suite_id}`).then((r) => r.data),
 };

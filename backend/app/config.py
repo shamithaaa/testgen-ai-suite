@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     DATADOG_API_KEY: str = "477f9e203e97b8a9a977e5b5a97035d"
     DATADOG_APP_KEY: str = "ddapp_muouvzeGlm3AM5bMvrYnRvOlm7ij4ef2Cm"
 
+    # AI Workspace
+    WORKSPACE_TEMP_DIR: str = "/tmp/workspaces"
+    MAX_FILE_SIZE_KB: int = 500
+    MAX_REPO_SIZE_MB: int = 100
+    COMMIT_AUTHOR_NAME: str = "SDLC AI"
+    COMMIT_AUTHOR_EMAIL: str = "ai@sdlc.dev"
+
     # App
     APP_ENV: str = "development"
     CORS_ORIGINS: list[str] = ["http://localhost:8080", "http://localhost:5173"]

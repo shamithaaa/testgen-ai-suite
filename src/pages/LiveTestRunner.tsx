@@ -1068,6 +1068,23 @@ function AnalyzingPhase({
   const currentStep = jobData?.step ?? "pending";
   const currentIdx = stepIndex(currentStep);
 
+  const getLogLineClassName = (line: string) => {
+    const trimmed = line.trimStart();
+
+    if (trimmed.startsWith("✓")) return "text-green-400";
+    if (trimmed.startsWith("Step")) return "text-primary font-semibold";
+
+    if (trimmed.startsWith("✗")) {
+      const rest = trimmed.slice(1).trimStart();
+      const hasErrorKeywords = /\b(error|failed|failure|exception|traceback|fatal)\b/i.test(rest);
+      const looksLikePath = /^(~?\/|[A-Za-z]:\\)/.test(rest);
+
+      return !hasErrorKeywords && looksLikePath ? "text-white/80" : "text-red-400";
+    }
+
+    return "text-white/80";
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -1121,12 +1138,7 @@ function AnalyzingPhase({
             {logs.map((line, i) => (
               <p
                 key={i}
-                className={`text-[11px] leading-relaxed ${
-                  line.startsWith("✓") ? "text-green-400" :
-                  line.startsWith("✗") ? "text-red-400" :
-                  line.startsWith("Step") ? "text-primary font-semibold" :
-                  "text-white/80"
-                }`}
+                className={`text-[11px] leading-relaxed ${getLogLineClassName(line)}`}
               >
                 {line}
               </p>

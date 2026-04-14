@@ -6,6 +6,7 @@ import asyncio
 import json
 import re
 import time
+import uuid
 from typing import Any
 
 from openai import AzureOpenAI, RateLimitError, APIStatusError
@@ -797,3 +798,114 @@ Return ONLY valid JSON:
 }}"""
     raw = await _call_openai(prompt)
     return json.loads(_clean_json(raw))
+
+
+async def generate_playwright_tests_from_source(
+    file_path: str,
+    content: str,
+    target_url: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Given a React/TypeScript source file from the workspace, generate PlaywrightTestCase
+    objects with structured steps. No running app required — steps use relative paths.
+    """
+    url_line = (
+        f"TARGET BASE URL: {target_url} (use as prefix for navigate steps)"
+        if target_url
+        else "TARGET BASE URL: not provided — use relative paths like '/', '/login', '/dashboard'"
+    )
+    truncated = content[:10000]
+
+    prompt = f"""You are a senior Playwright E2E test automation engineer specializing in React, TypeScript, and Radix UI.
+
+Given a React/TypeScript source file from a web application, generate comprehensive Playwright test cases.
+
+FILE PATH: {file_path}
+{url_line}
+
+SOURCE FILE:
+{truncated}
+
+Analyze the component/page to identify:
+- The page name and primary feature
+- All interactive elements: buttons, forms, inputs, links, dialogs
+- Key user flows (happy path, validation, error states)
+- Navigation patterns
+
+Return ONLY raw JSON — no markdown fences, no extra text:
+{{
+  "tests": [
+    {{
+      "name": "Concise descriptive test name",
+      "description": "One-sentence description of what is verified",
+      "page_name": "Name of the page or feature (e.g. Login, Dashboard)",
+      "severity": "Critical|High|Medium|Low",
+      "steps": [
+        {{
+          "action": "navigate",
+          "selector": null,
+          "value": "/",
+          "description": "Navigate to the page"
+        }},
+        {{
+          "action": "screenshot",
+          "selector": null,
+          "value": null,
+          "description": "Capture initial page state"
+        }},
+        {{
+          "action": "click",
+          "selector": "button:has-text(\\"Submit\\")",
+          "value": null,
+          "description": "Click the Submit button"
+        }},
+        {{
+          "action": "assert_text",
+          "selector": null,
+          "value": "Expected text on page",
+          "description": "Verify expected text is visible"
+        }},
+        {{
+          "action": "screenshot",
+          "selector": null,
+          "value": null,
+          "description": "Capture final state"
+        }}
+      ]
+    }}
+  ]
+}}
+
+SELECTOR RULES:
+- Buttons: button:has-text("Label")
+- Links: a:has-text("Label")
+- Email input: input[type="email"]
+- Password input: input[type="password"]
+- Text input with placeholder: input[placeholder="Search..."]
+- Radix Select trigger: [role="combobox"]
+- Radix Select option: [role="option"]:has-text("Value")
+- Radix Checkbox: [role="checkbox"]
+- Dialog: [role="dialog"]
+
+VALID ACTIONS: navigate, click, fill, assert_text, screenshot, wait, hover, hover_and_click, press, check, uncheck, select_option, dblclick, type_into, scroll, clear
+
+SEVERITY: Critical=auth/core flows, High=main features, Medium=secondary features, Low=cosmetic
+
+Rules:
+- Always start each test with a "navigate" step
+- Always include at least one "screenshot" step
+- Generate 4-7 test cases covering different scenarios
+- Each test should be independently executable
+- "wait" value is seconds as a string e.g. "2"
+- "hover_and_click": selector=element to hover, value=element to click after hover"""
+
+    raw = await _call_openai(prompt, json_mode=True)
+    data = json.loads(_clean_json(raw))
+    tests: list[dict[str, Any]] = data.get("tests", [])
+
+    for test in tests:
+        test.setdefault("id", str(uuid.uuid4()))
+        test.setdefault("analysis_id", "workspace")
+
+    return tests
+
