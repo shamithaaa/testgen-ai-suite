@@ -11,6 +11,7 @@ from app.routes import (
     prioritization, dashboard, repo_analysis,
     github, jira, ci_intelligence, defect_prediction, release_gate,
     monitoring, incidents, sprint,
+    workspace, copilot, git_ops, coverage, test_gen,
 )
 
 
@@ -59,6 +60,13 @@ app.include_router(release_gate.router, prefix=API_PREFIX)
 app.include_router(monitoring.router, prefix=API_PREFIX)
 app.include_router(incidents.router, prefix=API_PREFIX)
 app.include_router(sprint.router, prefix=API_PREFIX)
+
+# AI Workspace routes
+app.include_router(workspace.router, prefix=API_PREFIX)
+app.include_router(copilot.router, prefix=API_PREFIX)
+app.include_router(git_ops.router, prefix=API_PREFIX)
+app.include_router(coverage.router, prefix=API_PREFIX)
+app.include_router(test_gen.router, prefix=API_PREFIX)
 
 
 @app.get("/", tags=["Health"])
