@@ -16,6 +16,7 @@ import Monitoring from "./pages/Monitoring";
 import ReleaseGate from "./pages/ReleaseGate";
 import RequirementsIntelligence from "./pages/RequirementsIntelligence";
 import SprintIntelligence from "./pages/SprintIntelligence";
+import Workspace from "./pages/Workspace";
 import NotFound from "./pages/NotFound";
 import DashboardLayout from "@/components/DashboardLayout";
 import UserProfile from "./pages/UserProfile";
@@ -31,6 +32,7 @@ function App() {
           <Route path="/synthetic-data" element={<SyntheticData />} />
           <Route path="/test-execution" element={<TestExecution />} />
           <Route path="/prioritization" element={<Prioritization />} />
+          <Route path="/live-testing" element={<LiveTestRunner />} />
           <Route path="/live-test-runner" element={<LiveTestRunner />} />
           <Route path="/code-review" element={<CodeReview />} />
           <Route path="/ci-intelligence" element={<CIIntelligence />} />
@@ -41,6 +43,7 @@ function App() {
           <Route path="/release-gate" element={<ReleaseGate />} />
           <Route path="/requirements-intelligence" element={<RequirementsIntelligence />} />
           <Route path="/sprint-intelligence" element={<SprintIntelligence />} />
+          <Route path="/workspace" element={<Workspace />} />
           {/* New user profile route */}
           <Route path="/profile" element={<UserProfile />} />
         </Route>
