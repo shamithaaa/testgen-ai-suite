@@ -1,13 +1,8 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ThemeProvider } from "@/hooks/use-theme";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Requirements from "./pages/Requirements";
-import GeneratedTests from "./pages/GeneratedTests";
 import SyntheticData from "./pages/SyntheticData";
 import TestExecution from "./pages/TestExecution";
 import Prioritization from "./pages/Prioritization";
@@ -15,50 +10,44 @@ import LiveTestRunner from "./pages/LiveTestRunner";
 import CodeReview from "./pages/CodeReview";
 import CIIntelligence from "./pages/CIIntelligence";
 import DefectPrediction from "./pages/DefectPrediction";
-import ReleaseGate from "./pages/ReleaseGate";
-import Monitoring from "./pages/Monitoring";
+import GeneratedTests from "./pages/GeneratedTests";
 import Incidents from "./pages/Incidents";
-import SprintIntelligence from "./pages/SprintIntelligence";
+import Monitoring from "./pages/Monitoring";
+import ReleaseGate from "./pages/ReleaseGate";
 import RequirementsIntelligence from "./pages/RequirementsIntelligence";
-import DashboardLayout from "./components/DashboardLayout";
+import SprintIntelligence from "./pages/SprintIntelligence";
 import NotFound from "./pages/NotFound";
+import DashboardLayout from "@/components/DashboardLayout";
+import UserProfile from "./pages/UserProfile";
 
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route element={<DashboardLayout />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              {/* Test Generation Workflow */}
-              <Route path="/requirements" element={<Requirements />} />
-              <Route path="/generated-tests" element={<GeneratedTests />} />
-              <Route path="/synthetic-data" element={<SyntheticData />} />
-              <Route path="/test-execution" element={<TestExecution />} />
-              <Route path="/prioritization" element={<Prioritization />} />
-              <Route path="/live-testing" element={<LiveTestRunner />} />
-              {/* SDLC Intelligence */}
-              <Route path="/requirements-intelligence" element={<RequirementsIntelligence />} />
-              <Route path="/code-review" element={<CodeReview />} />
-              <Route path="/ci-intelligence" element={<CIIntelligence />} />
-              <Route path="/defect-prediction" element={<DefectPrediction />} />
-              <Route path="/release-gate" element={<ReleaseGate />} />
-              <Route path="/monitoring" element={<Monitoring />} />
-              {/* <Route path="/incidents" element={<Incidents />} /> */}
-              <Route path="/sprint-intelligence" element={<SprintIntelligence />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route element={<DashboardLayout />}> {/* App shell with sidebar/header */}
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/requirements" element={<Requirements />} />
+          <Route path="/synthetic-data" element={<SyntheticData />} />
+          <Route path="/test-execution" element={<TestExecution />} />
+          <Route path="/prioritization" element={<Prioritization />} />
+          <Route path="/live-test-runner" element={<LiveTestRunner />} />
+          <Route path="/code-review" element={<CodeReview />} />
+          <Route path="/ci-intelligence" element={<CIIntelligence />} />
+          <Route path="/defect-prediction" element={<DefectPrediction />} />
+          <Route path="/generated-tests" element={<GeneratedTests />} />
+          <Route path="/incidents" element={<Incidents />} />
+          <Route path="/monitoring" element={<Monitoring />} />
+          <Route path="/release-gate" element={<ReleaseGate />} />
+          <Route path="/requirements-intelligence" element={<RequirementsIntelligence />} />
+          <Route path="/sprint-intelligence" element={<SprintIntelligence />} />
+          {/* New user profile route */}
+          <Route path="/profile" element={<UserProfile />} />
+        </Route>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
 
 export default App;
