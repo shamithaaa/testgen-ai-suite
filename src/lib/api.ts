@@ -252,6 +252,65 @@ export interface FileNode {
   children?: FileNode[];
 }
 
+// ── Pipeline types ────────────────────────────────────────────────────────────
+
+export interface PipelineReview {
+  summary: string;
+  findings: { file: string; line: number | null; category: string; severity: string; message: string; suggestion: string }[];
+  security_flags: string[];
+  positives: string[];
+  recommendation: string;
+  coverage_estimate: number;
+}
+
+export interface PipelineReportRequest {
+  owner: string;
+  repo: string;
+  version?: string;
+  commit_sha?: string;
+  jira_project?: string;
+  live_test_passed?: number;
+  live_test_failed?: number;
+  live_test_total?: number;
+  review_recommendation?: string;
+  review_critical_count?: number;
+}
+
+export interface PipelineReport {
+  pipeline_run_id: string;
+  version: string;
+  commit_sha?: string;
+  score: number;
+  verdict: {
+    verdict: "GO" | "NO-GO" | "CONDITIONAL";
+    confidence: number;
+    primary_blocker: string | null;
+    recommendation: string;
+    conditions: string[];
+  };
+  signals: {
+    ci_pass_rate: number;
+    live_test_pass_rate: number;
+    live_test_passed: number;
+    live_test_failed: number;
+    live_test_total: number;
+    review_recommendation: string;
+    review_critical_findings: number;
+    open_critical_bugs: any[];
+    workflow_summary: Record<string, number>;
+  };
+  errors: string[];
+}
+
+export interface PipelineRunSummary {
+  id: string;
+  owner: string;
+  repo: string;
+  version: string;
+  score: number;
+  verdict: string;
+}
+
 export interface WorkspaceInfo {
   workspace_id: string;
   repo_url: string;
@@ -856,4 +915,16 @@ export const api = {
 
   deleteTestSuite: (suite_id: string) =>
     apiClient.delete(`/tests/workspace-suites/${suite_id}`).then((r) => r.data),
+
+  // ── Pipeline ──────────────────────────────────────────────────────────────
+  reviewCommit: (owner: string, repo: string, sha: string) =>
+    apiClient
+      .post(`/github/commits/${sha}/review`, null, { params: { owner, repo } })
+      .then((r) => r.data as { sha: string; review: PipelineReview; files_reviewed: number }),
+
+  evaluatePipeline: (payload: PipelineReportRequest) =>
+    apiClient.post<PipelineReport>("/pipeline/report", payload).then((r) => r.data),
+
+  listPipelineRuns: () =>
+    apiClient.get<PipelineRunSummary[]>("/pipeline/runs").then((r) => r.data),
 };

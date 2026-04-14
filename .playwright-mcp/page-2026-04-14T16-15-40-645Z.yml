@@ -1,0 +1,234 @@
+- generic [ref=e4]:
+  - generic [ref=e8]:
+    - generic [ref=e10]:
+      - img "SDLC logo" [ref=e12]
+      - generic [ref=e13]:
+        - heading "SDLC" [level=2] [ref=e14]
+        - paragraph [ref=e15]: AI-Powered SDLC Platform
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]: Pipeline
+        - list [ref=e20]:
+          - listitem [ref=e21]:
+            - link "SDLC Pipeline Workspace → Commit → Review → Tests → Report" [ref=e22] [cursor=pointer]:
+              - /url: /pipeline
+              - img [ref=e24]
+              - generic [ref=e28]:
+                - generic [ref=e29]: SDLC Pipeline
+                - generic [ref=e30]: Workspace → Commit → Review → Tests → Report
+      - generic [ref=e31]:
+        - generic [ref=e32]: Overview
+        - list [ref=e34]:
+          - listitem [ref=e35]:
+            - link "Dashboard" [ref=e36] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e38]
+              - generic [ref=e43]: Dashboard
+      - generic [ref=e44]:
+        - generic [ref=e45]: Test Generation
+        - list [ref=e47]:
+          - listitem [ref=e48]:
+            - link "1 Requirements Submit & analyze requirements" [ref=e49] [cursor=pointer]:
+              - /url: /requirements
+              - generic [ref=e50]:
+                - img [ref=e51]
+                - generic [ref=e54]: "1"
+              - generic [ref=e55]:
+                - generic [ref=e56]: Requirements
+                - generic [ref=e57]: Submit & analyze requirements
+          - listitem [ref=e58]:
+            - link "2 Test Suite Review AI-generated test cases" [ref=e59] [cursor=pointer]:
+              - /url: /generated-tests
+              - generic [ref=e60]:
+                - img [ref=e61]
+                - generic [ref=e64]: "2"
+              - generic [ref=e65]:
+                - generic [ref=e66]: Test Suite
+                - generic [ref=e67]: Review AI-generated test cases
+          - listitem [ref=e68]:
+            - link "3 Test Execution Execute & analyze results" [ref=e69] [cursor=pointer]:
+              - /url: /test-execution
+              - generic [ref=e70]:
+                - img [ref=e71]
+                - generic [ref=e73]: "3"
+              - generic [ref=e74]:
+                - generic [ref=e75]: Test Execution
+                - generic [ref=e76]: Execute & analyze results
+          - listitem [ref=e77]:
+            - link "4 Risk Ranking Prioritized by risk & severity" [ref=e78] [cursor=pointer]:
+              - /url: /prioritization
+              - generic [ref=e79]:
+                - img [ref=e80]
+                - generic [ref=e83]: "4"
+              - generic [ref=e84]:
+                - generic [ref=e85]: Risk Ranking
+                - generic [ref=e86]: Prioritized by risk & severity
+      - generic [ref=e87]:
+        - generic [ref=e88]: Tools
+        - list [ref=e90]:
+          - listitem [ref=e91]:
+            - link "Synthetic Data AI-generated test datasets" [ref=e92] [cursor=pointer]:
+              - /url: /synthetic-data
+              - img [ref=e94]
+              - generic [ref=e98]:
+                - generic [ref=e99]: Synthetic Data
+                - generic [ref=e100]: AI-generated test datasets
+          - listitem [ref=e101]:
+            - link "Live Test Runner Repository → AI → Browser execution" [ref=e102] [cursor=pointer]:
+              - /url: /live-testing
+              - img [ref=e104]
+              - generic [ref=e109]:
+                - generic [ref=e110]: Live Test Runner
+                - generic [ref=e111]: Repository → AI → Browser execution
+          - listitem [ref=e112]:
+            - link "AI Workspace Code editor + AI Copilot + Git" [ref=e113] [cursor=pointer]:
+              - /url: /workspace
+              - img [ref=e115]
+              - generic [ref=e119]:
+                - generic [ref=e120]: AI Workspace
+                - generic [ref=e121]: Code editor + AI Copilot + Git
+      - generic [ref=e122]:
+        - generic [ref=e123]: SDLC Intelligence
+        - list [ref=e125]:
+          - listitem [ref=e126]:
+            - link "Requirements Intel Jira stories + BDD generation" [ref=e127] [cursor=pointer]:
+              - /url: /requirements-intelligence
+              - img [ref=e129]
+              - generic [ref=e139]:
+                - generic [ref=e140]: Requirements Intel
+                - generic [ref=e141]: Jira stories + BDD generation
+          - listitem [ref=e142]:
+            - link "Code Review AI inline PR review" [ref=e143] [cursor=pointer]:
+              - /url: /code-review
+              - img [ref=e145]
+              - generic [ref=e149]:
+                - generic [ref=e150]: Code Review
+                - generic [ref=e151]: AI inline PR review
+          - listitem [ref=e152]:
+            - link "Defect Prediction File risk scoring from git history" [ref=e153] [cursor=pointer]:
+              - /url: /defect-prediction
+              - img [ref=e155]
+              - generic [ref=e164]:
+                - generic [ref=e165]: Defect Prediction
+                - generic [ref=e166]: File risk scoring from git history
+          - listitem [ref=e167]:
+            - link "Release Gate Go/no-go release decision" [ref=e168] [cursor=pointer]:
+              - /url: /release-gate
+              - img [ref=e170]
+              - generic [ref=e173]:
+                - generic [ref=e174]: Release Gate
+                - generic [ref=e175]: Go/no-go release decision
+          - listitem [ref=e176]:
+            - link "Monitoring Anomaly detection & predictive alerts" [ref=e177] [cursor=pointer]:
+              - /url: /monitoring
+              - img [ref=e179]
+              - generic [ref=e182]:
+                - generic [ref=e183]: Monitoring
+                - generic [ref=e184]: Anomaly detection & predictive alerts
+  - generic [ref=e185]:
+    - banner [ref=e186]:
+      - generic [ref=e187]:
+        - button "Toggle Sidebar" [ref=e188] [cursor=pointer]:
+          - img
+          - generic [ref=e189]: Toggle Sidebar
+        - generic [ref=e191]:
+          - img "SDLC logo" [ref=e193]
+          - generic [ref=e194]: SDLC
+      - generic [ref=e195]:
+        - button [ref=e196] [cursor=pointer]:
+          - img
+        - button "My Workspace" [ref=e197] [cursor=pointer]:
+          - generic [ref=e198]: My Workspace
+          - img [ref=e199]
+        - img [ref=e202]
+    - main [ref=e205]:
+      - generic [ref=e206]:
+        - generic [ref=e207]:
+          - generic [ref=e208]:
+            - button "Workspace" [ref=e209] [cursor=pointer]:
+              - img [ref=e211]
+              - generic [ref=e213]: Workspace
+            - img [ref=e214]
+          - generic [ref=e216]:
+            - button "Commit a1b2c3d" [ref=e217] [cursor=pointer]:
+              - img [ref=e219]
+              - generic [ref=e221]: Commit
+              - generic [ref=e222]: a1b2c3d
+            - img [ref=e223]
+          - generic [ref=e225]:
+            - button "3 Code Review 2 findings" [ref=e226] [cursor=pointer]:
+              - generic [ref=e227]: "3"
+              - generic [ref=e228]: Code Review
+              - generic [ref=e229]: 2 findings
+            - img [ref=e230]
+          - generic [ref=e232]:
+            - button "4 Test Gen 14 tests" [disabled] [ref=e233]:
+              - generic [ref=e234]: "4"
+              - generic [ref=e235]: Test Gen
+              - generic [ref=e236]: 14 tests
+            - img [ref=e237]
+          - generic [ref=e239]:
+            - button "5 Live Tests 11/14 passed" [disabled] [ref=e240]:
+              - generic [ref=e241]: "5"
+              - generic [ref=e242]: Live Tests
+              - generic [ref=e243]: 11/14 passed
+            - img [ref=e244]
+          - button "6 Report" [disabled] [ref=e247]:
+            - generic [ref=e248]: "6"
+            - generic [ref=e249]: Report
+        - generic [ref=e251]:
+          - generic [ref=e252]:
+            - generic [ref=e253]:
+              - img [ref=e254]
+              - generic [ref=e258]: Reviewing commit
+              - code [ref=e259]: a1b2c3d
+            - generic [ref=e260]:
+              - button "← Back" [ref=e261] [cursor=pointer]
+              - button "Skip" [ref=e262] [cursor=pointer]:
+                - img
+                - text: Skip
+              - button "Continue to Test Gen" [ref=e263] [cursor=pointer]:
+                - text: Continue to Test Gen
+                - img
+          - generic [ref=e268]:
+            - generic [ref=e269]:
+              - img [ref=e270]
+              - generic [ref=e272]:
+                - generic [ref=e273]:
+                  - generic [ref=e274]: CONDITIONAL
+                  - generic [ref=e275]: 8 files reviewed
+                - paragraph [ref=e276]: Good PR
+            - generic [ref=e277]:
+              - generic [ref=e278]:
+                - img [ref=e279]
+                - text: Security Flags
+              - paragraph [ref=e281]: • Potential SQL injection in api.ts:42
+            - generic [ref=e282]:
+              - generic [ref=e283]:
+                - generic [ref=e284]: 2 Findings
+                - generic [ref=e285]: 1 critical
+              - button "SQL injection risk critical security api.ts:42" [ref=e287] [cursor=pointer]:
+                - img [ref=e288]
+                - generic [ref=e292]:
+                  - generic [ref=e293]:
+                    - generic [ref=e294]: SQL injection risk
+                    - generic [ref=e295]: critical
+                    - generic [ref=e296]: security
+                  - paragraph [ref=e297]: api.ts:42
+                - img [ref=e298]
+              - button "Missing null check high bug utils.ts:15" [ref=e301] [cursor=pointer]:
+                - img [ref=e302]
+                - generic [ref=e304]:
+                  - generic [ref=e305]:
+                    - generic [ref=e306]: Missing null check
+                    - generic [ref=e307]: high
+                    - generic [ref=e308]: bug
+                  - paragraph [ref=e309]: utils.ts:15
+                - img [ref=e310]
+            - generic [ref=e312]:
+              - paragraph [ref=e313]: What looks good
+              - paragraph [ref=e314]: ✓ Tests included
+              - paragraph [ref=e315]: ✓ Clean code
+            - button "Continue to Test Generation" [ref=e316] [cursor=pointer]:
+              - text: Continue to Test Generation
+              - img

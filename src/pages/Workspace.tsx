@@ -15,9 +15,9 @@ import { StatusBar } from "@/components/workspace/StatusBar";
 import { useConnectWorkspace } from "@/hooks/use-workspace";
 import { toast } from "sonner";
 
-function ConnectForm() {
-  const [repoUrl, setRepoUrl] = useState("");
-  const [branch, setBranch] = useState("main");
+function ConnectForm({ initialRepoUrl, initialBranch }: { initialRepoUrl?: string; initialBranch?: string } = {}) {
+  const [repoUrl, setRepoUrl] = useState(initialRepoUrl ?? "");
+  const [branch, setBranch] = useState(initialBranch ?? "main");
   const [pat, setPat] = useState("");
   const [showPat, setShowPat] = useState(false);
   const { setWorkspace } = useWorkspaceContext();
@@ -117,11 +117,17 @@ function ConnectForm() {
   );
 }
 
-function WorkspaceLayout() {
+interface WorkspaceLayoutProps {
+  onCommitSuccess?: (sha: string, url: string) => void;
+  initialRepoUrl?: string;
+  initialBranch?: string;
+}
+
+export function WorkspaceLayout({ onCommitSuccess, initialRepoUrl, initialBranch }: WorkspaceLayoutProps = {}) {
   const { workspace } = useWorkspaceContext();
   const [showCommit, setShowCommit] = useState(false);
 
-  if (!workspace) return <ConnectForm />;
+  if (!workspace) return <ConnectForm initialRepoUrl={initialRepoUrl} initialBranch={initialBranch} />;
 
   return (
     <div className="flex flex-col h-full">
@@ -177,7 +183,7 @@ function WorkspaceLayout() {
                     <p className="text-xs font-medium">Commit & Push</p>
                   </div>
                   <ScrollArea className="flex-1">
-                    <CommitPanel />
+                    <CommitPanel onCommitSuccess={onCommitSuccess} />
                   </ScrollArea>
                 </div>
               </ResizablePanel>

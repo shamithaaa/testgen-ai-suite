@@ -17,6 +17,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 # ── Structured logger — output goes to the backend terminal ───────────────────
 log = logging.getLogger("playwright_service")
@@ -198,8 +199,17 @@ async def _run_step(
 
     try:
         if action == "navigate":
-            path = value if value.startswith("/") else ("/" + value if value else "")
-            url = target_url.rstrip("/") + path
+            if value and (value.startswith("http://") or value.startswith("https://")):
+                # Extract path from the full URL so tests stay portable across environments
+                # e.g. http://localhost:8083/todos → /todos → {target_url}/todos
+                parsed = urlparse(value)
+                path = parsed.path or "/"
+                if parsed.query:
+                    path += "?" + parsed.query
+                url = target_url.rstrip("/") + path
+            else:
+                path = value if value.startswith("/") else ("/" + value if value else "")
+                url = target_url.rstrip("/") + path
             log.info("    → goto %s", url)
             await page.goto(url, wait_until="domcontentloaded", timeout=25_000)
             try:

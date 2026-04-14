@@ -12,6 +12,7 @@ from app.routes import (
     github, jira, ci_intelligence, defect_prediction, release_gate,
     monitoring, incidents, sprint,
     workspace, copilot, git_ops, coverage, test_gen,
+    pipeline,
 )
 
 
@@ -67,6 +68,7 @@ app.include_router(copilot.router, prefix=API_PREFIX)
 app.include_router(git_ops.router, prefix=API_PREFIX)
 app.include_router(coverage.router, prefix=API_PREFIX)
 app.include_router(test_gen.router, prefix=API_PREFIX)
+app.include_router(pipeline.router, prefix=API_PREFIX)
 
 
 @app.get("/", tags=["Health"])

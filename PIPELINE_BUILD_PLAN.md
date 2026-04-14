@@ -1,232 +1,289 @@
-# SDLC Pipeline — Build Plan
+# SDLC Pipeline — Final Build Plan
 
-## The Flow (5 stages, one page: /pipeline)
+## The Flow  (route: /pipeline)
 
-```
-Workspace  →  Commit  →  Code Review  →  Test Gen  →  Report (GO/NO-GO)
-   [1]           [2]          [3]            [4]            [5]
-```
+Stage 1: Workspace       edit code + AI copilot
+Stage 2: Commit          stage files, push, capture SHA
+Stage 3: Code Review     AI review of that commit diff
+Stage 4: Test Case Gen   generate Playwright tests scoped to that commit
+Stage 5: Live Test Run   execute tests against running app, get pass/fail
+Stage 6: Report          GO / CONDITIONAL / NO-GO
 
-Each stage outputs data that becomes input to the next.
-The commit SHA from stage 2 auto-wires into stages 3 and 4.
-Stage 5 pulls from all prior stages into one verdict.
-
----
-
-## What Already Exists (reuse, don't rebuild)
-
-| Stage | What exists | Where |
-|-------|-------------|-------|
-| 1 Workspace | Full code editor + Copilot chat | src/pages/Workspace.tsx |
-| 2 Commit | CommitPanel (branch, file staging, push) | src/components/workspace/CommitPanel.tsx |
-| 3 Code Review | AI review of GitHub PRs | src/pages/CodeReview.tsx + backend/app/routes/github.py |
-| 4 Test Gen | Playwright test generator (per-commit scope) | src/components/workspace/TestGenerator.tsx |
-| 5 Report | Release gate score + go/no-go | src/pages/ReleaseGate.tsx + backend/app/routes/release_gate.py |
-
-Problem: all disconnected. No shared state. No flow between them.
+Data flows forward automatically:
+  SHA from Stage 2 → pre-fills Stages 3 and 4
+  Test results from Stage 5 → feeds into Stage 6 score
+  Review verdict from Stage 3 → feeds into Stage 6 score
 
 ---
 
-## What Gets Built
+## What Exists (reuse as-is, zero rebuild)
 
-### BACKEND — 2 new endpoints
-
-#### 1. POST /api/github/commits/{sha}/review
-File: backend/app/routes/github.py (add to existing router)
-
-Why: Current review only works on PRs. After committing from workspace there is
-no PR yet — only a SHA.
-
-Flow:
-  github_service.get_commit_diff(owner, repo, sha)
-    → GET /repos/{owner}/{repo}/commits/{sha}
-    → extract changed files + patches (same shape as PR files)
-  → pass to existing review_pull_request() AI function (no changes needed)
-  → return: { summary, findings[], recommendation, security_flags[] }
-
-New helper: backend/app/services/github_service.py
-  get_commit_diff(owner, repo, sha) → list[dict]
+| Stage | Existing piece | File |
+|-------|----------------|------|
+| 1 Workspace | WorkspaceLayout + WorkspaceProvider | src/pages/Workspace.tsx |
+| 2 Commit | CommitPanel component | src/components/workspace/CommitPanel.tsx |
+| 3 Code Review | review_pull_request() AI fn + /github/pr/{n}/review | backend/app/routes/github.py |
+| 4 Test Case Gen | TestGenerator component (commits scope) | src/components/workspace/TestGenerator.tsx |
+| 5 Live Test Run | useLiveTesting hook + all phase components | src/pages/LiveTestRunner.tsx |
+| 6 Report | ReleaseGate scoring + analyze_release_readiness() | backend/app/routes/release_gate.py |
 
 ---
 
-#### 2. POST /api/pipeline/report
-File: backend/app/routes/pipeline.py (new file)
+## New Backend (2 endpoints, 1 AI function)
 
-Why: Stage 5 needs one endpoint that aggregates ALL signals into a single go/no-go.
+### A.  POST /api/github/commits/{sha}/review
+File: backend/app/routes/github.py  (add to existing router, ~15 lines)
 
-Input body:
-  owner, repo, commit_sha, code_review{findings, recommendation},
-  test_suite{total, critical, high}, jira_project (optional)
+Why: Stage 3 reviews a raw commit SHA. Existing review endpoint needs a PR number.
 
-Flow:
-  1. Pull CI pass rate via github_service (reuse)
-  2. Pull open critical bugs via jira_service (optional)
-  3. score = CI(30) + review(25) + tests(20) + bugs(15) + defect_risk(10)
-  4. Call generate_pipeline_report() AI → narrative
-  5. Save to MongoDB `pipeline_runs`
-  6. Return: { verdict, score, signals{}, narrative, warnings[], pipeline_run_id }
+New helper in github_service.py:
+  get_commit_diff(owner, repo, sha)
+    GET /repos/{owner}/{repo}/commits/{sha}
+    returns same shape as get_pr_files() → files[]
+  Reuses existing review_pull_request() AI fn unchanged.
 
-New AI fn: backend/app/services/ai_service.py
-  generate_pipeline_report(version, signals, review_findings, test_counts) → dict
-
-Register: backend/main.py
+Response shape: same as PR review
+  { summary, findings[], recommendation, security_flags[], positives[] }
 
 ---
 
-### FRONTEND — 1 page + context + 7 components
+### B.  POST /api/pipeline/report
+File: backend/app/routes/pipeline.py  (new file, ~80 lines)
 
-#### PipelineContext   src/context/PipelineContext.tsx
-Shared state across all 5 stages. Persisted to sessionStorage.
+Accepts:
+  owner, repo, version
+  commit_sha          (optional)
+  jira_project        (optional)
+  live_test_passed    int
+  live_test_failed    int
+  live_test_total     int
+  review_recommendation  "GO"|"NO-GO"|"CONDITIONAL"  (optional)
+  review_critical_count  int  (optional)
 
-State:
-  Stage 1 output → repoUrl, owner, repo, branch, workspaceId
-  Stage 2 output → commitSha, commitMessage, commitGithubUrl
-  Stage 3 output → reviewResult, reviewStatus
-  Stage 4 output → testSuite[], testGenStatus
-  Stage 5 output → reportResult, reportStatus
-  activeStage: 1|2|3|4|5
+Score formula (out of 100):
+  CI pass rate (GitHub Actions):  25 pts
+  Live test pass rate:            35 pts  ← weighted higher (actual run data)
+  Code review verdict:            20 pts  (GO=20, CONDITIONAL=10, NO-GO=0)
+  Open critical bugs (Jira):      10 pts
+  Security findings:              10 pts
+
+Calls existing analyze_release_readiness() AI function (no changes needed).
+Saves result to MongoDB pipeline_runs collection.
+Returns: { verdict, score, signals{}, pipeline_run_id }
+
+Register in backend/main.py.
 
 ---
 
-#### Pipeline Page   src/pages/Pipeline.tsx   route: /pipeline
+## New Frontend (1 page + context + 6 stage components)
+
+### PipelineContext   src/context/PipelineContext.tsx
+sessionStorage-backed. Survives page refresh.
+
+Fields:
+  // Stage 1-2 output
+  repoUrl, owner, repo, branch, workspaceId
+
+  // Stage 2 output
+  commitSha, commitMessage, commitUrl
+
+  // Stage 3 output
+  reviewResult  { findings[], recommendation, security_flags[] } | null
+  reviewStatus  "idle"|"loading"|"done"|"error"
+
+  // Stage 4 output
+  testSuite  WorkspacePlaywrightTest[]
+
+  // Stage 5 output
+  liveTestSummary  { passed, failed, total, pass_rate } | null
+
+  // Stage 6 output
+  reportResult  { verdict, score, signals{} } | null
+
+  // Navigation
+  activeStage  1|2|3|4|5|6
+  completedStages  number[]
+
+---
+
+### Pipeline Page   src/pages/SDLCPipeline.tsx   route: /pipeline
 
   <PipelineProvider>
-    <PipelineProgressBar />
-    {activeStage === 1 && <StageWorkspace />}
-    {activeStage === 2 && <StageCommit />}
-    {activeStage === 3 && <StageCodeReview />}
-    {activeStage === 4 && <StageTestGen />}
-    {activeStage === 5 && <StageReport />}
+    <PipelineStageBar />
+    <div className="flex-1 min-h-0 overflow-auto">
+      {activeStage === 1 && <StageWorkspace />}
+      {activeStage === 2 && <StageCommit />}
+      {activeStage === 3 && <StageCodeReview />}
+      {activeStage === 4 && <StageTestGen />}
+      {activeStage === 5 && <StageTestRunner />}
+      {activeStage === 6 && <StageReport />}
+    </div>
   </PipelineProvider>
 
 ---
 
-#### PipelineProgressBar   src/components/pipeline/PipelineProgressBar.tsx
+### PipelineStageBar   src/components/pipeline/PipelineStageBar.tsx
 
-  [✓ Workspace] → [✓ Commit abc1234] → [◎ Code Review] → [○ Test Gen] → [○ Report]
+Visual:
+  [✓ Workspace] → [✓ Commit abc123] → [◎ Review] → [○ Test Gen] → [○ Run] → [○ Report]
 
-  ✓ green checkmark = completed, clickable (go back)
-  ◎ filled = active stage
-  ○ empty = locked until previous stage done
-  Each done stage shows a short badge (SHA / finding count / test count / score)
-
----
-
-#### StageWorkspace   src/components/pipeline/StageWorkspace.tsx
-Renders existing <WorkspaceLayout> in full.
-Adds: pipeline banner + "Continue to Commit →" button.
-On connect: writes repoUrl, owner, repo, workspaceId → PipelineContext.
+  ✓ green = completed (clickable to go back)
+  ◎ filled = active
+  ○ grey = locked
+  Completed stages show a short badge: SHA / "3 findings" / "12 tests" / "87/100"
 
 ---
 
-#### StageCommit   src/components/pipeline/StageCommit.tsx
-Full-width version of existing <CommitPanel> (not buried in a sidebar).
-On successful commit:
-  - Writes commitSha, commitMessage, commitGithubUrl → PipelineContext
-  - Shows success card + "Continue to Code Review →" CTA
-Change to CommitPanel.tsx: add optional onCommitSuccess(sha, url) prop.
+### StageWorkspace   src/components/pipeline/StageWorkspace.tsx
+
+Renders existing <WorkspaceLayout> unchanged inside PipelineContext.WorkspaceProvider.
+Adds banner: "Step 1 of 6 — Connect repo and start editing"
+"Continue to Commit →" button activates once workspace.workspaceId is set.
+Writes repoUrl, owner, repo, branch, workspaceId → PipelineContext on connect.
 
 ---
 
-#### StageCodeReview   src/components/pipeline/StageCodeReview.tsx
-Two tabs:
-  "This Commit" — auto-calls POST /api/github/commits/{sha}/review
-  "Other PRs"   — reuses existing PR list + review UI
-On review done: writes reviewResult → PipelineContext.
+### StageCommit   src/components/pipeline/StageCommit.tsx
+
+Full-width layout showing <CommitPanel> prominently (not buried in sidebar).
+CommitPanel gets one new optional prop:
+  onCommitSuccess?: (sha: string, url: string) => void
+On commit: writes commitSha, commitMessage, commitUrl → PipelineContext.
+Shows success card + "Continue to Code Review →" CTA with SHA and GitHub link.
+
+---
+
+### StageCodeReview   src/components/pipeline/StageCodeReview.tsx
+
+Auto-populated from PipelineContext.commitSha and owner/repo.
+"Run AI Review" button → POST /api/github/commits/{sha}/review.
+Renders findings, recommendation banner, security flags.
+"Skip" link for repos without GitHub token configured.
+Writes reviewResult → PipelineContext.
 "Continue to Test Generation →" CTA.
 
 ---
 
-#### StageTestGen   src/components/pipeline/StageTestGen.tsx
-Renders existing <TestGenerator>.
-Pre-selects scope="commits", pre-fills SHA from PipelineContext.
-Toggle: "This commit" / "Entire app".
+### StageTestGen   src/components/pipeline/StageTestGen.tsx
+
+Renders <TestGenerator> with:
+  initialScope = "commits"
+  initialCommitSha = PipelineContext.commitSha
+
+TestGenerator gets two new optional props:
+  initialScope?: "single_file"|"entire_app"|"commits"|"virtual_files"
+  initialCommitSha?: string
+
 On tests generated: writes testSuite[] → PipelineContext.
-"Continue to Report →" CTA.
-Change to TestGenerator.tsx: add initialScope + initialCommitSha props.
+"Continue to Live Test Runner →" CTA (active once tests.length > 0).
 
 ---
 
-#### StageReport   src/components/pipeline/StageReport.tsx
+### StageTestRunner   src/components/pipeline/StageTestRunner.tsx
+
+Renders the full LiveTestRunner page content (all phase components reused).
+Pre-populates githubUrl from PipelineContext.repoUrl.
+LiveTestRunner gets one new optional prop:
+  onRunComplete?: (summary: { passed, failed, total, pass_rate }) => void
+
+On run complete (phase === "done"):
+  Writes liveTestSummary → PipelineContext.
+  Shows "Continue to Report →" CTA.
+
+---
+
+### StageReport   src/components/pipeline/StageReport.tsx
+
 Calls POST /api/pipeline/report with all PipelineContext data.
 Renders:
-  1. Verdict banner: GO (green) / CONDITIONAL (amber) / NO_GO (red)
-  2. Score gauge (reuse ScoreGauge from ReleaseGate.tsx)
-  3. Signal breakdown table: CI rate | review findings | test counts | bugs | defect risk
-  4. AI narrative paragraph
-  5. Actions: re-run any stage | export PDF | start new pipeline
+  1. Verdict banner: GO (green) / CONDITIONAL (amber) / NO-GO (red)
+  2. Score gauge (copied from ReleaseGate.tsx — ScoreGauge function)
+  3. Signal table:
+       CI Pass Rate        from GitHub Actions
+       Live Test Pass Rate from Stage 5 results
+       Code Review         from Stage 3 verdict
+       Open Critical Bugs  from Jira (if configured)
+       Security Findings   from code review flags
+  4. AI narrative
+  5. Actions: re-run any stage | export PDF (reuse pdf-report.ts) | New pipeline
 
 ---
 
-### API CLIENT   src/lib/api.ts  (3 additions)
-  reviewCommit(owner, repo, sha)        → POST /api/github/commits/{sha}/review
-  evaluatePipeline(body)                → POST /api/pipeline/report
-  listPipelineRuns()                    → GET  /api/pipeline/runs
+### Hooks   src/hooks/use-pipeline.ts
+  useReviewCommit()      useMutation → POST /api/github/commits/{sha}/review
+  useEvaluatePipeline()  useMutation → POST /api/pipeline/report
 
-### HOOKS   src/hooks/use-pipeline.ts
-  useReviewCommit()      → useMutation
-  useEvaluatePipeline()  → useMutation
-  usePipelineRuns()      → useQuery
+### API additions   src/lib/api.ts
+  reviewCommit(owner, repo, sha)
+  evaluatePipeline(body: PipelineReportRequest)
 
 ---
 
-## Sidebar + Routing
+## Sidebar + Route
 
-src/App.tsx → add route /pipeline
+src/App.tsx
+  Add: <Route path="/pipeline" element={<SDLCPipeline />} />
 
-src/components/AppSidebar.tsx → new top section "Pipeline":
-  [ ⬡ SDLC Pipeline ]   /pipeline   "Workspace → Commit → Review → Tests → Report"
+src/components/AppSidebar.tsx
+  New group "Pipeline" at top (above Test Generation section):
+  [ ⬡ SDLC Pipeline ]  /pipeline  "Workspace → Commit → Review → Tests → Report"
 
 ---
 
-## Files Changed
+## All Files
 
-### New (10 files)
+New (12 files):
   src/context/PipelineContext.tsx
-  src/pages/Pipeline.tsx
-  src/components/pipeline/PipelineProgressBar.tsx
+  src/pages/SDLCPipeline.tsx
+  src/components/pipeline/PipelineStageBar.tsx
   src/components/pipeline/StageWorkspace.tsx
   src/components/pipeline/StageCommit.tsx
   src/components/pipeline/StageCodeReview.tsx
   src/components/pipeline/StageTestGen.tsx
+  src/components/pipeline/StageTestRunner.tsx
   src/components/pipeline/StageReport.tsx
   src/hooks/use-pipeline.ts
   backend/app/routes/pipeline.py
+  src/components/pipeline/   (directory)
 
-### Modified (9 files)
-  backend/app/routes/github.py               ← add commit review endpoint
-  backend/app/services/github_service.py     ← add get_commit_diff()
-  backend/app/services/ai_service.py         ← add generate_pipeline_report()
-  backend/main.py                            ← register pipeline router
-  src/lib/api.ts                             ← 3 new methods + types
-  src/App.tsx                                ← add /pipeline route
-  src/components/AppSidebar.tsx              ← add Pipeline nav entry
-  src/components/workspace/CommitPanel.tsx   ← add onCommitSuccess prop
-  src/components/workspace/TestGenerator.tsx ← add initialScope + initialCommitSha props
+Modified (9 files — minimal changes):
+  backend/app/routes/github.py           +15 lines: commit review endpoint
+  backend/app/services/github_service.py +10 lines: get_commit_diff()
+  backend/main.py                        +2 lines: import + register pipeline router
+  src/lib/api.ts                         +20 lines: 2 new methods + types
+  src/App.tsx                            +2 lines: route
+  src/components/AppSidebar.tsx          +6 lines: nav entry
+  src/components/workspace/CommitPanel.tsx     +3 lines: optional prop
+  src/components/workspace/TestGenerator.tsx   +4 lines: optional props
+  src/pages/LiveTestRunner.tsx                 +5 lines: optional prop
 
 ---
 
 ## Build Order
 
-  Phase 1 — Backend (no blockers)
-    1. github_service.py  →  get_commit_diff()
-    2. github.py          →  POST /commits/{sha}/review
-    3. ai_service.py      →  generate_pipeline_report()
-    4. pipeline.py        →  POST /report  +  GET /runs
-    5. main.py            →  register pipeline router
+  Phase 1 — Backend (independent)
+    1. github_service.py  get_commit_diff()
+    2. github.py          POST /commits/{sha}/review
+    3. pipeline.py        POST /pipeline/report
+    4. main.py            register router
 
-  Phase 2 — Frontend types & hooks (after Phase 1)
-    6. api.ts             →  new methods + types
-    7. use-pipeline.ts    →  hooks
+  Phase 2 — Frontend plumbing (after Phase 1)
+    5. api.ts             new methods
+    6. use-pipeline.ts    hooks
 
-  Phase 3 — Shell (after Phase 2)
-    8. PipelineContext.tsx
-    9. Pipeline.tsx  +  PipelineProgressBar.tsx
-   10. App.tsx route  +  AppSidebar entry
+  Phase 3 — Shell
+    7. PipelineContext.tsx
+    8. SDLCPipeline.tsx
+    9. PipelineStageBar.tsx
+   10. App.tsx + AppSidebar.tsx
 
-  Phase 4 — Stage components (after Phase 3)
-   11. StageWorkspace.tsx   (patch CommitPanel prop)
-   12. StageCommit.tsx
-   13. StageCodeReview.tsx
-   14. StageTestGen.tsx     (patch TestGenerator prop)
-   15. StageReport.tsx
+  Phase 4 — Stage components + minimal patches
+   11. CommitPanel.tsx patch
+   12. TestGenerator.tsx patch
+   13. LiveTestRunner.tsx patch
+   14. StageWorkspace.tsx
+   15. StageCommit.tsx
+   16. StageCodeReview.tsx
+   17. StageTestGen.tsx
+   18. StageTestRunner.tsx
+   19. StageReport.tsx

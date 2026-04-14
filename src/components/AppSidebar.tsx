@@ -7,14 +7,11 @@ import {
   ArrowUpDown,
   Clapperboard,
   GitPullRequest,
-  Activity,
   Bug,
   Lock,
-  BarChart3,
-  AlertOctagon,
   Gauge,
-  Brain,
   Code2,
+  Workflow,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -31,28 +28,23 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const workflowSteps = [
-  { step: 1, title: "Requirements", url: "/requirements", icon: FileText, hint: "Submit & analyze requirements" },
-  { step: 2, title: "Test Suite", url: "/generated-tests", icon: TestTubes, hint: "Review AI-generated test cases" },
-  { step: 3, title: "Test Execution", url: "/test-execution", icon: Play, hint: "Execute & analyze results" },
-  { step: 4, title: "Risk Ranking", url: "/prioritization", icon: ArrowUpDown, hint: "Prioritized by risk & severity" },
-];
+const pipelineItem = { title: "SDLC Pipeline", url: "/pipeline", icon: Workflow, hint: "Workspace → Commit → Review → Tests → Report" };
 
-const toolItems = [
-  { title: "Synthetic Data", url: "/synthetic-data", icon: Database, hint: "AI-generated test datasets" },
-  { title: "Live Test Runner", url: "/live-testing", icon: Clapperboard, hint: "Repository → AI → Browser execution" },
+const sdlcTools = [
   { title: "AI Workspace", url: "/workspace", icon: Code2, hint: "Code editor + AI Copilot + Git" },
-];
-
-const sdlcItems = [
-  { title: "Requirements Intel", url: "/requirements-intelligence", icon: Brain, hint: "Jira stories + BDD generation" },
-  { title: "Code Review", url: "/code-review", icon: GitPullRequest, hint: "AI inline PR review" },
-  // { title: "CI/CD Intelligence", url: "/ci-intelligence", icon: Activity, hint: "Build health & flaky test detection" },
+  { title: "Code Reviewer", url: "/code-review", icon: GitPullRequest, hint: "AI inline PR review" },
+  { title: "Live Test Runner", url: "/live-testing", icon: Clapperboard, hint: "Repository → AI → Browser execution" },
   { title: "Defect Prediction", url: "/defect-prediction", icon: Bug, hint: "File risk scoring from git history" },
   { title: "Release Gate", url: "/release-gate", icon: Lock, hint: "Go/no-go release decision" },
   { title: "Monitoring", url: "/monitoring", icon: Gauge, hint: "Anomaly detection & predictive alerts" },
-  // { title: "Incidents", url: "/incidents", icon: AlertOctagon, hint: "Root cause AI investigation" },
-  // { title: "Sprint Intelligence", url: "/sprint-intelligence", icon: BarChart3, hint: "DORA metrics & sprint summary" },
+];
+
+const betaItems = [
+  { title: "Requirements", url: "/requirements", icon: FileText, hint: "Beta · In Progress" },
+  { title: "Test Suite", url: "/generated-tests", icon: TestTubes, hint: "Beta · In Progress" },
+  { title: "Test Execution", url: "/test-execution", icon: Play, hint: "Beta · In Progress" },
+  { title: "Risk Ranking", url: "/prioritization", icon: ArrowUpDown, hint: "Beta · In Progress" },
+  { title: "Synthetic Data", url: "/synthetic-data", icon: Database, hint: "Beta · In Progress" },
 ];
 
 export function AppSidebar() {
@@ -105,21 +97,49 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Test Generation Workflow */}
+        {/* Pipeline */}
         <SidebarGroup>
           {!collapsed && (
             <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
-              Test Generation
+              Pipeline
             </SidebarGroupLabel>
           )}
           <SidebarGroupContent>
             <SidebarMenu>
-              {workflowSteps.map((item) => (
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive(pipelineItem.url)} tooltip={pipelineItem.title} size={collapsed ? "default" : "lg"}>
+                  <NavLink to={pipelineItem.url} end className="transition-colors" activeClassName="bg-primary/10 text-primary">
+                    <div className="h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0">
+                      <pipelineItem.icon className="h-4 w-4" />
+                    </div>
+                    {!collapsed && (
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm leading-tight">{pipelineItem.title}</span>
+                        <span className="text-[10px] text-muted-foreground truncate">{pipelineItem.hint}</span>
+                      </div>
+                    )}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* SDLC Tools */}
+        <SidebarGroup>
+          {!collapsed && (
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              SDLC Tools
+            </SidebarGroupLabel>
+          )}
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {sdlcTools.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild
                     isActive={isActive(item.url)}
-                    tooltip={`Step ${item.step}: ${item.title}`}
+                    tooltip={item.title}
                     size={collapsed ? "default" : "lg"}
                   >
                     <NavLink
@@ -128,44 +148,6 @@ export function AppSidebar() {
                       className="transition-colors"
                       activeClassName="bg-primary/10 text-primary"
                     >
-                      <div className="relative h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0">
-                        <item.icon className="h-4 w-4" />
-                        <span className={`absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full text-[8px] font-bold flex items-center justify-center ${isActive(item.url) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                          {item.step}
-                        </span>
-                      </div>
-                      {!collapsed && (
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-sm leading-tight">{item.title}</span>
-                          <span className="text-[10px] text-muted-foreground truncate">{item.hint}</span>
-                        </div>
-                      )}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Tools */}
-        <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
-              Tools
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {toolItems.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
-                    size={collapsed ? "default" : "lg"}
-                  >
-                    <NavLink to={item.url} end className="transition-colors" activeClassName="bg-primary/10 text-primary">
                       <div className="h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0">
                         <item.icon className="h-4 w-4" />
                       </div>
@@ -183,16 +165,16 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* SDLC Intelligence */}
+        {/* Beta / In Progress */}
         <SidebarGroup>
           {!collapsed && (
             <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
-              SDLC Intelligence
+              Beta / In Progress
             </SidebarGroupLabel>
           )}
           <SidebarGroupContent>
             <SidebarMenu>
-              {sdlcItems.map((item) => (
+              {betaItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild

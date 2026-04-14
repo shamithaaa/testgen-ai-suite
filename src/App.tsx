@@ -17,6 +17,7 @@ import ReleaseGate from "./pages/ReleaseGate";
 import RequirementsIntelligence from "./pages/RequirementsIntelligence";
 import SprintIntelligence from "./pages/SprintIntelligence";
 import Workspace from "./pages/Workspace";
+import SDLCPipeline from "./pages/SDLCPipeline";
 import NotFound from "./pages/NotFound";
 import DashboardLayout from "@/components/DashboardLayout";
 import UserProfile from "./pages/UserProfile";
@@ -44,6 +45,7 @@ function App() {
           <Route path="/requirements-intelligence" element={<RequirementsIntelligence />} />
           <Route path="/sprint-intelligence" element={<SprintIntelligence />} />
           <Route path="/workspace" element={<Workspace />} />
+          <Route path="/pipeline" element={<SDLCPipeline />} />
           {/* New user profile route */}
           <Route path="/profile" element={<UserProfile />} />
         </Route>

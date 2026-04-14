@@ -1756,7 +1756,11 @@ function RunHistoryPanel() {
   );
 }
 
-export default function LiveTestRunner() {
+export default function LiveTestRunner({
+  onRunComplete,
+}: {
+  onRunComplete?: (summary: { passed: number; failed: number; total: number; pass_rate: number }) => void;
+} = {}) {
   const {
     phase,
     jobData,
@@ -1771,6 +1775,20 @@ export default function LiveTestRunner() {
     isStarting,
     isExecuting,
   } = useLiveTesting();
+
+  // Fire onRunComplete once when run transitions to done
+  const reportedRef = useCallback(() => {}, []);
+  if (phase === "done" && runStatus && onRunComplete) {
+    const t = runStatus.total ?? 0;
+    const p = runStatus.passed ?? 0;
+    const f = runStatus.failed ?? 0;
+    const key = `${runStatus.run_id}-reported`;
+    if (t > 0 && !sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, "1");
+      onRunComplete({ passed: p, failed: f, total: t, pass_rate: t > 0 ? Math.round((p / t) * 100) : 0 });
+    }
+  }
+  void reportedRef; // suppress unused warning
 
   return (
     <div className="p-6 max-w-6xl mx-auto">

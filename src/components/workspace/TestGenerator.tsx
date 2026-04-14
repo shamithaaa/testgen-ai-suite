@@ -317,13 +317,21 @@ function SavedSuites({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export function TestGenerator() {
+export function TestGenerator({
+  initialScope,
+  initialCommitSha,
+  onTestsGenerated,
+}: {
+  initialScope?: Scope;
+  initialCommitSha?: string;
+  onTestsGenerated?: (tests: WorkspacePlaywrightTest[]) => void;
+} = {}) {
   const { workspace, openTabs, activeTab, openFile } = useWorkspaceContext();
-  const [scope, setScope] = useState<Scope>("single_file");
+  const [scope, setScope] = useState<Scope>(initialScope ?? "single_file");
   const [targetUrl, setTargetUrl] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [tests, setTests] = useState<WorkspacePlaywrightTest[]>([]);
-  const [selectedCommitSha, setSelectedCommitSha] = useState<string>("");
+  const [selectedCommitSha, setSelectedCommitSha] = useState<string>(initialCommitSha ?? "");
   const [showSaved, setShowSaved] = useState(false);
   const [suiteName, setSuiteName] = useState("");
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -379,6 +387,7 @@ export function TestGenerator() {
 
       if (result) {
         setTests(result.tests);
+        onTestsGenerated?.(result.tests);
         toast.success(`Generated ${result.tests.length} test cases`);
       }
     } catch (err: any) {

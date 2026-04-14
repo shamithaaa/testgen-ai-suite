@@ -11,7 +11,7 @@ import { useWorkspaceContext } from "@/context/WorkspaceContext";
 import { useGitStatus, useCommitAndPush, useCreateBranch } from "@/hooks/use-git";
 import { toast } from "sonner";
 
-export function CommitPanel() {
+export function CommitPanel({ onCommitSuccess }: { onCommitSuccess?: (sha: string, url: string) => void } = {}) {
   const { workspace, openTabs, diffState, currentBranch, setCurrentBranch } = useWorkspaceContext();
   const [commitMsg, setCommitMsg] = useState(diffState?.commitMessage ?? "");
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -67,6 +67,7 @@ export function CommitPanel() {
         new_file_contents: newFileContents,
       });
       setCommitResult({ sha: result.sha, github_url: result.github_url });
+      onCommitSuccess?.(result.sha, result.github_url);
       toast.success(`Committed ${result.sha.slice(0, 7)} → ${currentBranch}`);
       setSelectedFiles(new Set());
       setCommitMsg("");
