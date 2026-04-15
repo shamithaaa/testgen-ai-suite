@@ -75,14 +75,14 @@ const Landing = () => {
           </p>
 
           <div className="flex items-center gap-4 justify-center mb-10">
-            <Button
+            {/* <Button
               size="lg"
               className="bg-primary text-primary-foreground hover:bg-primary/90 font-display font-semibold px-8 h-12 text-base"
               onClick={() => navigate("/requirements")}
             >
               Get Started — Submit Requirement
               <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            </Button> */}
             <Button
               size="lg"
               variant="outline"

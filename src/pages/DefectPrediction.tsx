@@ -40,8 +40,10 @@ function CustomTreemapContent({ x, y, width, height, name, risk_score }: any) {
   );
 }
 
+const DEFAULT_REPO = "balaji-joulestowatts/simple-tasks";
+
 function RepoInput({ onSearch }: { onSearch: (owner: string, repo: string) => void }) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(DEFAULT_REPO);
   const handle = () => {
     const parts = input.trim().replace("https://github.com/", "").split("/");
     if (parts.length >= 2) onSearch(parts[0], parts[1]);
@@ -70,7 +72,10 @@ function RepoInput({ onSearch }: { onSearch: (owner: string, repo: string) => vo
 }
 
 export default function DefectPrediction() {
-  const [repoCoords, setRepoCoords] = useState<{ owner: string; repo: string } | null>(null);
+  const [repoCoords, setRepoCoords] = useState<{ owner: string; repo: string } | null>({
+    owner: "balaji-joulestowatts",
+    repo: "simple-tasks",
+  });
 
   const riskQuery = useQuery({
     queryKey: ["defect-risk", repoCoords?.owner, repoCoords?.repo],

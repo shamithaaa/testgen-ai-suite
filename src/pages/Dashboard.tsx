@@ -26,20 +26,26 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { data: stats, isError } = useDashboardStats();
 
-  // Fall back to mock-derived values when backend is unreachable
+  // Fall back to mock-derived values when backend is unreachable or has no data
   const mockPassed = mockTestResults.filter((t) => t.status === "PASS").length;
   const mockFailed = mockTestResults.filter((t) => t.status === "FAIL").length;
   const mockTotal = mockTestResults.length;
   const mockTotalTests = Object.values(mockTestCases).flat().length;
 
-  const totalTests = stats?.total_tests ?? mockTotalTests;
-  const passed = stats?.latest_run.passed ?? mockPassed;
-  const failed = stats?.latest_run.failed ?? mockFailed;
-  const successRate = stats?.latest_run.success_rate ?? Math.round((mockPassed / mockTotal) * 100);
-  const avgDuration = (stats?.latest_run.avg_duration ?? (mockTestResults.reduce((s, t) => s + t.duration, 0) / mockTotal)).toFixed(1);
-  const knownFailures = stats?.known_failures ?? mockPrioritizedTests.filter((t) => t.knownFailure).length;
-  const highPriority = stats?.high_priority ?? mockPrioritizedTests.filter((t) => t.priority >= 80).length;
-  const activeVehicles = stats?.active_vehicles ?? mockSyntheticData.filter((d) => d.status === "Active").length;
+  // Use mock data when API is errored or returned empty results (total_tests === 0)
+  const useMock = isError || !stats || (stats.total_tests ?? 0) === 0;
+
+  const totalTests = useMock ? mockTotalTests : stats!.total_tests;
+  const passed = useMock ? mockPassed : stats!.latest_run.passed;
+  const failed = useMock ? mockFailed : stats!.latest_run.failed;
+  const successRate = useMock ? Math.round((mockPassed / mockTotal) * 100) : stats!.latest_run.success_rate;
+  const avgDuration = (useMock
+    ? mockTestResults.reduce((s, t) => s + t.duration, 0) / mockTotal
+    : stats!.latest_run.avg_duration
+  ).toFixed(1);
+  const knownFailures = useMock ? mockPrioritizedTests.filter((t) => t.knownFailure).length : stats!.known_failures;
+  const highPriority = useMock ? mockPrioritizedTests.filter((t) => t.priority >= 80).length : stats!.high_priority;
+  const activeVehicles = useMock ? mockSyntheticData.filter((d) => d.status === "Active").length : stats!.active_vehicles;
 
   // KPI cards
   const kpis = [
@@ -61,7 +67,7 @@ const Dashboard = () => {
     { day: "Sat", passed: 15, failed: 2, total: 17 },
     { day: "Sun", passed: mockPassed, failed: mockFailed, total: mockTotal },
   ];
-  const weeklyTrend = stats?.weekly_trend?.length ? stats.weekly_trend : mockWeekly;
+  const weeklyTrend = (!useMock && stats?.weekly_trend?.length) ? stats.weekly_trend : mockWeekly;
 
   // Category distribution — derived from real test_case_counts or mock
   const mockCounts = {
@@ -71,7 +77,7 @@ const Dashboard = () => {
     failure: mockTestCases.failure.length,
     regression: mockTestCases.regression.length,
   };
-  const counts = stats?.test_case_counts ?? mockCounts;
+  const counts = (!useMock && stats?.test_case_counts) ? stats.test_case_counts : mockCounts;
   const categoryData = Object.entries(counts).map(([name, value]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     value,
@@ -366,7 +372,7 @@ const Dashboard = () => {
           </div>
           <div className="floating-card p-5 text-center">
             <BarChart3 className="h-5 w-5 text-secondary mx-auto mb-2" />
-            <span className="text-3xl font-display font-bold text-gradient block">{stats ? Object.values(stats.test_case_counts).reduce((a, b) => a + b, 0) : mockSyntheticData.length}</span>
+            <span className="text-3xl font-display font-bold text-gradient block">{useMock ? mockSyntheticData.length : Object.values(stats!.test_case_counts).reduce((a, b) => a + b, 0)}</span>
             <span className="text-xs text-muted-foreground">Synthetic Data Records</span>
           </div>
           <div className="floating-card p-5 text-center">

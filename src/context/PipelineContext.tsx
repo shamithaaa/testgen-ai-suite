@@ -40,15 +40,18 @@ interface PipelineCtxValue extends PipelineState {
   setReviewResult: (result: PipelineState["reviewResult"]) => void;
   setReviewStatus: (s: PipelineState["reviewStatus"]) => void;
   setTestSuite: (tests: WorkspacePlaywrightTest[]) => void;
-  setLiveTestSummary: (s: LiveTestSummary) => void;
-  setReportResult: (r: PipelineReport) => void;
+  setLiveTestSummary: (s: LiveTestSummary | null) => void;
+  setReportResult: (r: PipelineReport | null) => void;
   goToStage: (n: number) => void;
   completeStage: (n: number) => void;
   resetPipeline: () => void;
 }
 
 const defaultState: PipelineState = {
-  repoUrl: "", owner: "", repo: "", branch: "main", workspaceId: null,
+  repoUrl: "https://github.com/balaji-joulestowatts/simple-tasks",
+  owner: "balaji-joulestowatts",
+  repo: "simple-tasks",
+  branch: "main", workspaceId: null,
   commitSha: null, commitMessage: null, commitUrl: null,
   reviewResult: null, reviewStatus: "idle",
   testSuite: [],
@@ -87,11 +90,11 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     update({ testSuite });
   }, [update]);
 
-  const setLiveTestSummary = useCallback((liveTestSummary: LiveTestSummary) => {
+  const setLiveTestSummary = useCallback((liveTestSummary: LiveTestSummary | null) => {
     update({ liveTestSummary });
   }, [update]);
 
-  const setReportResult = useCallback((reportResult: PipelineReport) => {
+  const setReportResult = useCallback((reportResult: PipelineReport | null) => {
     update({ reportResult });
   }, [update]);
 

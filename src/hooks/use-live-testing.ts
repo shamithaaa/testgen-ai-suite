@@ -31,6 +31,7 @@ export function useStartAnalyzeRepo() {
       testEmail,
       testPassword,
       testPreferences,
+      numTests,
       mode,
       commitSha,
       commitMessage,
@@ -40,13 +41,14 @@ export function useStartAnalyzeRepo() {
       testEmail?: string;
       testPassword?: string;
       testPreferences?: string;
+      numTests?: number;
       mode?: "full" | "commit";
       commitSha?: string;
       commitMessage?: string;
     }) =>
       api.startAnalyzeRepo(
         githubUrl, targetUrl, testEmail, testPassword, testPreferences,
-        mode, commitSha, commitMessage,
+        numTests, mode, commitSha, commitMessage,
       ),
   });
 }
@@ -142,6 +144,7 @@ export function useLiveTesting() {
       testEmail?: string,
       testPassword?: string,
       testPreferences?: string,
+      numTests?: number,
       mode?: "full" | "commit",
       commitSha?: string,
       commitMessage?: string,
@@ -156,7 +159,7 @@ export function useLiveTesting() {
       try {
         const res = await startAnalyze.mutateAsync({
           githubUrl, targetUrl, testEmail, testPassword, testPreferences,
-          mode, commitSha, commitMessage,
+          numTests, mode, commitSha, commitMessage,
         });
         setJobId(res.job_id);
       } catch (err: unknown) {

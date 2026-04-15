@@ -30,7 +30,7 @@ function ScoreGauge({ score }: { score: number }) {
 }
 
 export default function ReleaseGate() {
-  const [form, setForm] = useState({ version: "", owner: "", repo: "", jira_project: "" });
+  const [form, setForm] = useState({ version: "", owner: "balaji-joulestowatts", repo: "simple-tasks", jira_project: "" });
 
   const evaluateMutation = useMutation({
     mutationFn: () => api.evaluateRelease({

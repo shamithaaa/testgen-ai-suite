@@ -44,7 +44,7 @@ function DoraLevel({ rate }: { rate: number }) {
 }
 
 export default function SprintIntelligence() {
-  const [form, setForm] = useState({ owner: "", repo: "", jira_project: "", sprint_name: "" });
+  const [form, setForm] = useState({ owner: "balaji-joulestowatts", repo: "simple-tasks", jira_project: "", sprint_name: "" });
 
   const reportMutation = useMutation({
     mutationFn: () =>

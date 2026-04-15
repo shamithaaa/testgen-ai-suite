@@ -21,6 +21,7 @@ class RepoAnalysisRequest(BaseModel):
     test_email: Optional[str] = None
     test_password: Optional[str] = None
     test_preferences: Optional[str] = None
+    num_tests: int = 1              # how many test cases to generate (default 1)
     # ── Commit-targeted mode ──────────────────────────────────────
     mode: str = "full"              # "full" | "commit"
     commit_sha: Optional[str] = None    # selected commit SHA (commit mode only)

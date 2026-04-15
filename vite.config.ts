@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    allowedHosts: ["advancement-courts-substances-mpegs.trycloudflare.com"],
     watch: {
       usePolling: true,
       interval: 300,

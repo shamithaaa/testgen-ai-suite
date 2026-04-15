@@ -27,17 +27,36 @@ function ScoreGauge({ score }: { score: number }) {
   );
 }
 
-const VERDICT_CFG: Record<string, { color: string; icon: React.ElementType; bg: string; border: string; label: string }> = {
-  "GO":          { color: "text-green-400",  icon: CheckCircle,   bg: "bg-green-500/10",  border: "border-green-500/30",  label: "GO" },
-  "NO-GO":       { color: "text-red-400",    icon: XCircle,       bg: "bg-red-500/10",    border: "border-red-500/30",    label: "NO-GO" },
-  "CONDITIONAL": { color: "text-yellow-400", icon: AlertTriangle, bg: "bg-yellow-500/10", border: "border-yellow-500/30", label: "CONDITIONAL" },
+const VERDICT_CFG: Record<string, { color: string; icon: React.ElementType; bg: string; border: string; label: string; description: string }> = {
+  "GO":          { color: "text-green-400",  icon: CheckCircle,   bg: "bg-green-500/10",  border: "border-green-500/30",  label: "GO",          description: "All quality gates passed. The build is safe to release to production." },
+  "NO-GO":       { color: "text-red-400",    icon: XCircle,       bg: "bg-red-500/10",    border: "border-red-500/30",    label: "NO-GO",       description: "One or more critical blockers detected. Release must be halted until resolved." },
+  "CONDITIONAL": { color: "text-yellow-400", icon: AlertTriangle, bg: "bg-yellow-500/10", border: "border-yellow-500/30", label: "CONDITIONAL", description: "Release is possible only after addressing the listed conditions and re-validating." },
 };
+
+function VerdictLegend() {
+  return (
+    <div className="rounded-xl border border-border/40 bg-muted/20 p-4 space-y-2">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">What does each verdict mean?</p>
+      {Object.values(VERDICT_CFG).map(({ icon: Icon, color, bg, border, label, description }) => (
+        <div key={label} className={`flex items-start gap-3 p-2.5 rounded-lg border ${bg} ${border}`}>
+          <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${color}`} />
+          <div>
+            <span className={`text-xs font-bold ${color}`}>{label}</span>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function StageReport() {
   const {
     owner, repo, commitSha,
     reviewResult, liveTestSummary,
     reportResult, setReportResult,
+    setLiveTestSummary,
+    setReviewResult, setReviewStatus,
     goToStage, resetPipeline,
   } = usePipelineContext();
 
@@ -111,6 +130,7 @@ export function StageReport() {
                   </div>
                 ))}
               </div>
+              <VerdictLegend />
               {evaluateMutation.isError && (
                 <p className="text-sm text-red-400">Report failed. Check GitHub access and API keys.</p>
               )}
@@ -134,6 +154,7 @@ export function StageReport() {
                       <VIcon className={`h-6 w-6 ${vcfg.color}`} />
                       <span className={`text-2xl font-bold ${vcfg.color}`}>{vcfg.label}</span>
                     </div>
+                    <p className={`text-xs font-medium ${vcfg.color}`}>{vcfg.description}</p>
                     <p className="text-sm text-muted-foreground leading-relaxed">{r.verdict?.recommendation}</p>
                     {r.verdict?.primary_blocker && (
                       <div className="rounded-lg bg-red-500/5 border border-red-500/20 p-3">
@@ -178,8 +199,32 @@ export function StageReport() {
 
               {/* Actions */}
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={() => goToStage(2)}>Re-run Review</Button>
-                <Button variant="outline" className="flex-1" onClick={() => goToStage(4)}>Re-run Tests</Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    // Clear review-downstream results so the review stage runs fresh
+                    setReviewResult(null);
+                    setReviewStatus("idle");
+                    setLiveTestSummary(null);
+                    setReportResult(null);
+                    goToStage(2);
+                  }}
+                >
+                  Re-run Review
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    // Clear test & report results so the test runner starts fresh
+                    setLiveTestSummary(null);
+                    setReportResult(null);
+                    goToStage(3);
+                  }}
+                >
+                  Re-run Tests
+                </Button>
                 <Button variant="outline" className="flex-1" onClick={resetPipeline}>
                   <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> New Pipeline
                 </Button>

@@ -20,8 +20,10 @@ const CONCLUSION_CONFIG: Record<string, { color: string; icon: React.ElementType
 
 const PIE_COLORS = ["#22c55e", "#ef4444", "#f59e0b", "#6b7280"];
 
+const DEFAULT_REPO = "balaji-joulestowatts/simple-tasks";
+
 function RepoInput({ onSearch }: { onSearch: (owner: string, repo: string) => void }) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(DEFAULT_REPO);
   const handle = () => {
     const parts = input.trim().replace("https://github.com/", "").split("/");
     if (parts.length >= 2) onSearch(parts[0], parts[1]);
@@ -50,7 +52,10 @@ function RepoInput({ onSearch }: { onSearch: (owner: string, repo: string) => vo
 }
 
 export default function CIIntelligence() {
-  const [repoCoords, setRepoCoords] = useState<{ owner: string; repo: string } | null>(null);
+  const [repoCoords, setRepoCoords] = useState<{ owner: string; repo: string } | null>({
+    owner: "balaji-joulestowatts",
+    repo: "simple-tasks",
+  });
   const [explainRunId, setExplainRunId] = useState<number | null>(null);
 
   const healthQuery = useQuery({

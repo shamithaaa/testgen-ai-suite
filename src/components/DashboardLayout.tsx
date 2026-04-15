@@ -13,13 +13,6 @@ const DashboardLayout = () => {
           <header className="h-14 flex items-center justify-between border-b border-border/50 bg-background/80 backdrop-blur-xl px-4 sticky top-0 z-30">
             <div className="flex items-center gap-3">
               <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-              <div className="h-5 w-px bg-border" />
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-md bg-background border border-border/50 flex items-center justify-center overflow-hidden p-1">
-                  <img src="/logo.png" alt="SDLC logo" className="h-full w-full object-contain scale-125" />
-                </div>
-                <span className="font-display font-semibold text-sm">SDLC</span>
-              </div>
             </div>
             <div className="flex items-center gap-3">
               <ThemeToggle />

@@ -85,6 +85,7 @@ async def start_analyze(body: RepoAnalysisRequest, background_tasks: BackgroundT
         body.test_email,
         body.test_password,
         body.test_preferences,
+        num_tests=body.num_tests,
         mode=body.mode,
         commit_sha=body.commit_sha,
         commit_message=body.commit_message,

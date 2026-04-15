@@ -256,6 +256,7 @@ async def generate_playwright_tests(
     test_email: str | None = None,
     test_password: str | None = None,
     test_preferences: str | None = None,
+    num_tests: int = 1,
 ) -> list[dict[str, Any]]:
     """
     Given a structured codebase analysis, generate Playwright test cases with
@@ -362,7 +363,7 @@ Return ONLY valid JSON (no markdown) with exactly this shape:
 STRICT RULES — follow every rule or tests will fail:
 
 GENERAL:
-- Generate 5–8 test cases covering different pages and user flows.
+- Generate EXACTLY {num_tests} test case(s). No more, no fewer.
 - ALWAYS start each test with a "navigate" step.
 - Include at least 2 "screenshot" steps per test (beginning and end).
 - For login fill steps, use EXACTLY the credentials provided above (not placeholders).
@@ -428,6 +429,7 @@ async def analyze_commit_and_generate_tests(
     target_url: str,
     test_email: str | None = None,
     test_password: str | None = None,
+    num_tests: int = 1,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """
     Given the diff of a specific commit, first understand what user-facing
@@ -473,7 +475,7 @@ Analyze what user-facing functionality changed in this commit. Focus on:
 - What user interactions are affected
 
 PART 2 — GENERATE TARGETED PLAYWRIGHT TESTS
-Generate 4–6 targeted Playwright test cases that specifically verify the changed functionality.
+Generate EXACTLY {num_tests} targeted Playwright test case(s) that specifically verify the changed functionality.
 These are REGRESSION tests — confirm the commit's changes work correctly.
 
 Return ONLY valid JSON (no markdown, no explanation):

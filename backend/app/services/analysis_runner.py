@@ -30,6 +30,7 @@ def create_job(
     test_email: str | None = None,
     test_password: str | None = None,
     test_preferences: str | None = None,
+    num_tests: int = 1,
     mode: str = "full",
     commit_sha: str | None = None,
     commit_message: str | None = None,
@@ -45,6 +46,7 @@ def create_job(
         "test_email": test_email,
         "test_password": test_password,
         "test_preferences": test_preferences,
+        "num_tests": max(1, min(num_tests, 10)),  # clamp 1–10
         "mode": mode,                      # "full" | "commit"
         "commit_sha": commit_sha,
         "commit_message": commit_message,
@@ -68,6 +70,7 @@ async def run_analysis(job_id: str) -> None:
     test_email: str | None = job.get("test_email")
     test_password: str | None = job.get("test_password")
     test_preferences: str | None = job.get("test_preferences")
+    num_tests: int = job.get("num_tests", 1)
 
     def log(msg: str) -> None:
         job["logs"].append(msg)
@@ -115,7 +118,7 @@ async def run_analysis(job_id: str) -> None:
         job["step"] = "generating"
         if test_email:
             log(f"  ℹ Using provided credentials ({test_email}) in test generation")
-        log("Step 4/4: Generating Playwright test cases...")
+        log(f"Step 4/4: Generating {num_tests} Playwright test case(s)...")
         try:
             tests_raw = await generate_playwright_tests(
                 analysis_data,
@@ -123,6 +126,7 @@ async def run_analysis(job_id: str) -> None:
                 test_email=test_email,
                 test_password=test_password,
                 test_preferences=test_preferences,
+                num_tests=num_tests,
             )
         except AIQuotaError as exc:
             raise RuntimeError(f"AI quota exceeded during test generation: {exc}") from exc
@@ -186,6 +190,7 @@ async def run_commit_analysis(job_id: str) -> None:
     commit_message: str = job.get("commit_message", "")
     test_email: str | None = job.get("test_email")
     test_password: str | None = job.get("test_password")
+    num_tests: int = job.get("num_tests", 1)
 
     def log(msg: str) -> None:
         job["logs"].append(msg)
@@ -230,6 +235,7 @@ async def run_commit_analysis(job_id: str) -> None:
                 target_url=job["target_url"],
                 test_email=test_email,
                 test_password=test_password,
+                num_tests=num_tests,
             )
         except AIQuotaError as exc:
             raise RuntimeError(f"AI quota exceeded: {exc}") from exc
@@ -243,7 +249,7 @@ async def run_commit_analysis(job_id: str) -> None:
 
         # ── Step 4: Persist tests ─────────────────────────────────────────────
         job["step"] = "generating"
-        log("Step 4/4: Saving targeted test cases...")
+        log(f"Step 4/4: Saving targeted test cases...")
         log(f"  ✓ Generated {len(tests_raw)} targeted test cases for this commit")
 
         db = get_db()

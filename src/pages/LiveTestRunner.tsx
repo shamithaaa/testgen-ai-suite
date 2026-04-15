@@ -599,19 +599,20 @@ function InputPhase({
 }: {
   onAnalyze: (
     github: string, target: string, email?: string, password?: string, preferences?: string,
-    mode?: "full" | "commit", commitSha?: string, commitMessage?: string,
+    numTests?: number, mode?: "full" | "commit", commitSha?: string, commitMessage?: string,
   ) => void;
   isAnalyzing: boolean;
   errorMsg: string | null;
 }) {
-  const [githubUrl, setGithubUrl] = useState("");
-  const [targetUrl, setTargetUrl] = useState("");
-  const [testEmail, setTestEmail] = useState("");
-  const [testPassword, setTestPassword] = useState("");
+  const [githubUrl, setGithubUrl] = useState("https://github.com/balaji-joulestowatts/simple-tasks");
+  const [targetUrl, setTargetUrl] = useState("https://simple-tasks-zeta.vercel.app/");
+  const [testEmail, setTestEmail] = useState("balaji0707srp@gmail.com");
+  const [testPassword, setTestPassword] = useState("1234567890");
   const [showPassword, setShowPassword] = useState(false);
   const [testPreferences, setTestPreferences] = useState("");
   const [selectedChips, setSelectedChips] = useState<Set<string>>(new Set());
   const [testCaseType, setTestCaseType] = useState("e2e");
+  const [numTests, setNumTests] = useState(1);
 
   // ── Commit-mode state ────────────────────────────────────────────────────
   const [testingScope, setTestingScope] = useState<"full" | "commit">("full");
@@ -999,6 +1000,30 @@ function InputPhase({
                 )}
               </div>
 
+              <div className="rounded-xl border border-border/50 bg-card/40 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground">Number of Tests</p>
+                    <p className="text-[11px] text-muted-foreground">How many test cases to generate (1–10)</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isAnalyzing || numTests <= 1}
+                      onClick={() => setNumTests((v) => Math.max(1, v - 1))}
+                      className="h-7 w-7 rounded border border-border/60 bg-muted/40 text-sm font-bold text-foreground hover:bg-muted disabled:opacity-40 flex items-center justify-center"
+                    >−</button>
+                    <span className="w-6 text-center text-sm font-semibold tabular-nums">{numTests}</span>
+                    <button
+                      type="button"
+                      disabled={isAnalyzing || numTests >= 10}
+                      onClick={() => setNumTests((v) => Math.min(10, v + 1))}
+                      className="h-7 w-7 rounded border border-border/60 bg-muted/40 text-sm font-bold text-foreground hover:bg-muted disabled:opacity-40 flex items-center justify-center"
+                    >+</button>
+                  </div>
+                </div>
+              </div>
+
               <div className="mt-auto pt-1">
                 <Button
                   className="w-full"
@@ -1014,6 +1039,7 @@ function InputPhase({
                       testEmail || undefined,
                       testPassword || undefined,
                       combinedPrefs || undefined,
+                      numTests,
                       testingScope,
                       selectedCommit?.sha,
                       selectedCommit?.message,
@@ -1796,7 +1822,7 @@ export default function LiveTestRunner({
         {phase === "idle" && (
           <InputPhase
             key="input"
-            onAnalyze={(g, t, e, p, prefs, mode, sha, msg) => handleAnalyze(g, t, e, p, prefs, mode, sha, msg)}
+            onAnalyze={(g, t, e, p, prefs, numTests, mode, sha, msg) => handleAnalyze(g, t, e, p, prefs, numTests, mode, sha, msg)}
             isAnalyzing={isStarting}
             errorMsg={errorMsg}
           />

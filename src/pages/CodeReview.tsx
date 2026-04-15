@@ -10,11 +10,18 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 
-const SEVERITY_CONFIG: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-  critical: { color: "text-red-400 bg-red-500/10 border-red-500/30", icon: XCircle, label: "Critical" },
-  high:     { color: "text-orange-400 bg-orange-500/10 border-orange-500/30", icon: AlertTriangle, label: "High" },
-  medium:   { color: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30", icon: Info, label: "Medium" },
-  low:      { color: "text-blue-400 bg-blue-500/10 border-blue-500/30", icon: Info, label: "Low" },
+const SEVERITY_CONFIG: Record<string, { textColor: string; bg: string; border: string; icon: React.ElementType; label: string }> = {
+  critical: { textColor: "text-red-400",    bg: "bg-red-500/10",    border: "border-red-500/30",    icon: XCircle,       label: "Critical" },
+  high:     { textColor: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30", icon: AlertTriangle, label: "High" },
+  medium:   { textColor: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/30", icon: Info,          label: "Medium" },
+  low:      { textColor: "text-blue-400",   bg: "bg-blue-500/10",   border: "border-blue-500/30",   icon: Info,          label: "Low" },
+};
+
+const RECOMMENDATION_CONFIG: Record<string, { label: string; description: string; color: string }> = {
+  "APPROVE":          { label: "Approved",           description: "No blocking issues. Code is ready to merge.",              color: "text-green-400 border-green-500/30" },
+  "REQUEST_CHANGES":  { label: "Changes Requested",  description: "Issues found that must be resolved before merging.",       color: "text-red-400 border-red-500/30" },
+  "COMMENT":          { label: "Commented",           description: "Suggestions provided — not blocking, but worth reviewing.", color: "text-yellow-400 border-yellow-500/30" },
+  "CONDITIONAL":      { label: "Conditional",         description: "Can merge after addressing the listed conditions.",         color: "text-yellow-400 border-yellow-500/30" },
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -27,7 +34,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 function RepoInput({ onSearch }: { onSearch: (owner: string, repo: string) => void }) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState("balaji-joulestowatts/simple-tasks");
 
   const handleSearch = () => {
     const parts = input.trim().replace("https://github.com/", "").split("/");
@@ -80,20 +87,25 @@ function PRCard({ pr, owner, repo }: { pr: any; owner: string; repo: string }) {
             <span>@{pr.author}</span>
             <span>{pr.base} ← {pr.head}</span>
             {pr.changed_files > 0 && <span>{pr.changed_files} files</span>}
-            <span className="text-green-400">+{pr.additions}</span>
-            <span className="text-red-400">-{pr.deletions}</span>
+            {(pr.additions > 0 || pr.deletions > 0) && (
+              <>
+                <span className="text-green-400">+{pr.additions}</span>
+                <span className="text-red-400">-{pr.deletions}</span>
+              </>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {review && (
-            <Badge className={`text-xs border ${
-              review.review?.summary?.overall_risk === "critical" ? "border-red-500/30 text-red-400" :
-              review.review?.summary?.overall_risk === "high" ? "border-orange-500/30 text-orange-400" :
-              "border-green-500/30 text-green-400"
-            }`}>
-              {review.review?.summary?.overall_risk?.toUpperCase() || "REVIEWED"}
-            </Badge>
-          )}
+          {review && (() => {
+            const recKey = review.review?.summary?.review_recommendation ?? "COMMENT";
+            const recCfg = RECOMMENDATION_CONFIG[recKey] ?? RECOMMENDATION_CONFIG["COMMENT"];
+            return (
+              <div className="text-right">
+                <Badge className={`text-xs border ${recCfg.color}`}>{recCfg.label}</Badge>
+                <p className="text-[10px] text-muted-foreground mt-0.5 max-w-[160px]">{recCfg.description}</p>
+              </div>
+            );
+          })()}
           {!review && (
             <Button
               size="sm"
@@ -125,15 +137,18 @@ function PRCard({ pr, owner, repo }: { pr: any; owner: string; repo: string }) {
               {/* Summary */}
               <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
                 <p className="text-sm font-medium mb-1">{review.review?.summary?.what_changed}</p>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2 flex-wrap">
                   <span>Coverage: {review.review?.summary?.test_coverage_estimate}</span>
-                  <Badge variant="outline" className={`text-xs ${
-                    review.review?.summary?.review_recommendation === "APPROVE" ? "text-green-400 border-green-500/30" :
-                    review.review?.summary?.review_recommendation === "REQUEST_CHANGES" ? "text-red-400 border-red-500/30" :
-                    "text-yellow-400 border-yellow-500/30"
-                  }`}>
-                    {review.review?.summary?.review_recommendation}
-                  </Badge>
+                  {(() => {
+                    const recKey = review.review?.summary?.review_recommendation ?? "COMMENT";
+                    const recCfg = RECOMMENDATION_CONFIG[recKey] ?? RECOMMENDATION_CONFIG["COMMENT"];
+                    return (
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="outline" className={`text-xs ${recCfg.color}`}>{recCfg.label}</Badge>
+                        <span className="text-[10px] text-muted-foreground italic">{recCfg.description}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -145,20 +160,25 @@ function PRCard({ pr, owner, repo }: { pr: any; owner: string; repo: string }) {
                   </p>
                   <div className="space-y-2">
                     {review.review.findings.map((f: any, i: number) => {
-                      const cfg = SEVERITY_CONFIG[f.severity] || SEVERITY_CONFIG.low;
+                      const cfg = SEVERITY_CONFIG[f.severity?.toLowerCase()] || SEVERITY_CONFIG.low;
                       const Icon = cfg.icon;
                       return (
-                        <div key={i} className={`p-3 rounded-lg border text-xs ${cfg.color}`}>
+                        <div key={i} className={`p-3 rounded-lg border ${cfg.bg} ${cfg.border}`}>
                           <div className="flex items-start gap-2">
-                            <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            <Icon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${cfg.textColor}`} />
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <code className="text-[10px] bg-black/20 px-1 rounded">{f.file}:{f.line}</code>
-                                <span className={`text-[10px] font-medium ${CATEGORY_COLORS[f.category] || ""}`}>{f.category}</span>
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className={`text-[10px] font-bold uppercase tracking-wide ${cfg.textColor}`}>{cfg.label}</span>
+                                {f.file && (
+                                  <code className="text-[10px] bg-muted/50 px-1 rounded text-foreground/70">{f.file}{f.line ? `:${f.line}` : ""}</code>
+                                )}
+                                {f.category && (
+                                  <span className={`text-[10px] font-medium ${CATEGORY_COLORS[f.category] || "text-muted-foreground"}`}>{f.category}</span>
+                                )}
                               </div>
-                              <p className="text-foreground/90">{f.message}</p>
+                              <p className="text-xs text-foreground/90">{f.message}</p>
                               {f.suggestion && (
-                                <p className="mt-1 text-muted-foreground italic">{f.suggestion}</p>
+                                <p className="mt-1 text-[11px] text-muted-foreground italic">{f.suggestion}</p>
                               )}
                             </div>
                           </div>
@@ -207,7 +227,10 @@ function PRCard({ pr, owner, repo }: { pr: any; owner: string; repo: string }) {
 }
 
 export default function CodeReview() {
-  const [repoCoords, setRepoCoords] = useState<{ owner: string; repo: string } | null>(null);
+  const [repoCoords, setRepoCoords] = useState<{ owner: string; repo: string } | null>({
+    owner: "balaji-joulestowatts",
+    repo: "simple-tasks",
+  });
 
   const prsQuery = useQuery({
     queryKey: ["github-prs", repoCoords?.owner, repoCoords?.repo],
