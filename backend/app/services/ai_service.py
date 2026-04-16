@@ -60,6 +60,12 @@ async def _call_openai(prompt: str, json_mode: bool = True) -> str:
     """Async wrapper — runs the sync call in a thread so the event loop isn't blocked."""
     return await asyncio.to_thread(_call_openai_sync, prompt, json_mode)
 
+
+# Public alias used by impact_service and other services that prefer a shorter name
+async def call_ai(prompt: str, max_tokens: int = 2000) -> str:
+    """Public async helper: sends a prompt and returns the raw text response."""
+    return await _call_openai(prompt, json_mode=False)
+
 # --------------------------------------------------------------------------
 
 
@@ -806,6 +812,7 @@ async def generate_playwright_tests_from_source(
     file_path: str,
     content: str,
     target_url: str | None = None,
+  num_tests: int | None = None,
 ) -> list[dict[str, Any]]:
     """
     Given a React/TypeScript source file from the workspace, generate PlaywrightTestCase
@@ -817,6 +824,7 @@ async def generate_playwright_tests_from_source(
         else "TARGET BASE URL: not provided — use relative paths like '/', '/login', '/dashboard'"
     )
     truncated = content[:10000]
+    requested_tests = max(1, min(int(num_tests or 5), 20))
 
     prompt = f"""You are a senior Playwright E2E test automation engineer specializing in React, TypeScript, and Radix UI.
 
@@ -896,7 +904,7 @@ SEVERITY: Critical=auth/core flows, High=main features, Medium=secondary feature
 Rules:
 - Always start each test with a "navigate" step
 - Always include at least one "screenshot" step
-- Generate 4-7 test cases covering different scenarios
+- Generate EXACTLY {requested_tests} test cases covering different scenarios
 - Each test should be independently executable
 - "wait" value is seconds as a string e.g. "2"
 - "hover_and_click": selector=element to hover, value=element to click after hover"""

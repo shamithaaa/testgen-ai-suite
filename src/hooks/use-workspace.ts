@@ -35,6 +35,7 @@ export function useSaveWorkspaceFile() {
       qc.invalidateQueries({ queryKey: ["workspace-file", workspaceId, path] });
       qc.invalidateQueries({ queryKey: ["workspace-tree", workspaceId] });
       qc.invalidateQueries({ queryKey: ["git-status", workspaceId] });
+      qc.invalidateQueries({ queryKey: ["commit-impact-tree", workspaceId] });
     },
   });
 }

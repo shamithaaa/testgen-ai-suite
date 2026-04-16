@@ -311,6 +311,102 @@ export interface PipelineRunSummary {
   verdict: string;
 }
 
+export interface DeploymentTriggerRequest {
+  repo_url?: string;
+  branch?: string;
+  commit_sha?: string;
+  target?: "production" | "preview";
+}
+
+export interface DeploymentTriggerResponse {
+  deploymentId: string;
+  url: string;
+  status: string;
+  createdAt?: number;
+  inspectorUrl?: string;
+  triggeredBy?: DeploymentActor | null;
+  projectName?: string;
+  domains?: string[];
+  target?: string;
+  sourceBranch?: string;
+  sourceCommitSha?: string;
+  repoUrl?: string;
+  branch?: string;
+  commitSha?: string;
+  ref?: string;
+}
+
+export interface DeploymentActor {
+  id?: string | null;
+  username?: string | null;
+  email?: string | null;
+}
+
+export interface DeploymentStatusResponse {
+  deploymentId: string;
+  status: "QUEUED" | "BUILDING" | "INITIALIZING" | "READY" | "ERROR" | "CANCELED" | "UNKNOWN" | string;
+  url?: string;
+  createdAt?: number;
+  inspectorUrl?: string;
+  triggeredBy?: DeploymentActor | null;
+  projectName?: string;
+  domains?: string[];
+  target?: string;
+  sourceBranch?: string;
+  sourceCommitSha?: string;
+  sourceCommitMessage?: string;
+  sourceRepo?: string;
+  ready: boolean;
+}
+
+export interface DeploymentLogEvent {
+  id: string;
+  level: string;
+  message: string;
+  timestamp?: string | number;
+}
+
+export interface DeploymentEventsResponse {
+  deploymentId: string;
+  events: DeploymentLogEvent[];
+}
+
+export interface DeploymentConfigHealth {
+  configured: boolean;
+  project_name: string;
+  has_project_id: boolean;
+  has_team_id: boolean;
+  has_repo_id: boolean;
+  dynamic_repo_supported?: boolean;
+}
+
+export interface DeploymentRepoOption {
+  name: string;
+  sha?: string;
+  protected?: boolean;
+}
+
+export interface DeploymentCommitOption {
+  sha: string;
+  short_sha: string;
+  message: string;
+  author: string;
+  date?: string;
+}
+
+export interface DeploymentRepoOptionsResponse {
+  repo: {
+    owner: string;
+    name: string;
+    id: string;
+    default_branch: string;
+    url: string;
+  };
+  branches: DeploymentRepoOption[];
+  selected_branch: string;
+  commits: DeploymentCommitOption[];
+}
+
 export interface WorkspaceInfo {
   workspace_id: string;
   repo_url: string;
@@ -426,6 +522,34 @@ export interface GitStatus {
   untracked: string[];
 }
 
+export interface CommitImpactTreeNode {
+  id: string;
+  path: string;
+  name: string;
+  status: "M" | "U" | "A" | "D" | " ";
+  depth: number;
+  is_entry: boolean;
+  imports_count: number;
+  impacted_by_count: number;
+  children: CommitImpactTreeNode[];
+}
+
+export interface CommitImpactTreeResponse {
+  workspace_id: string;
+  roots: CommitImpactTreeNode[];
+  summary: {
+    root_count: number;
+    node_count: number;
+    max_depth: number;
+    status_counts: {
+      M: number;
+      U: number;
+      A: number;
+      D: number;
+    };
+  };
+}
+
 export interface GitLogEntry {
   sha: string;
   short_sha: string;
@@ -526,6 +650,7 @@ export interface PlaywrightGenerateRequest {
   file_path: string;
   content: string;
   target_url?: string;
+  num_tests?: number;
 }
 
 export interface PlaywrightGenerateResponse {
@@ -737,6 +862,28 @@ export const api = {
   updatePlaywrightTest: (test_id: string, data: Partial<PlaywrightTestCase>) =>
     apiClient.put<PlaywrightTestCase>(`/repo/tests/${test_id}`, data).then((r) => r.data),
 
+  // Run tests directly without going through the analysis pipeline
+  executeTestsDirect: (tests: PlaywrightTestCase[], targetUrl: string) =>
+    apiClient
+      .post<{ run_id: string; total: number; status: string }>("/repo/execute-direct", {
+        tests,
+        target_url: targetUrl,
+      })
+      .then((r) => r.data),
+
+  // Parse a .spec.ts file into structured test cases
+  uploadAndParseSpec: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiClient
+      .post<{ filename: string; test_count: number; tests: PlaywrightTestCase[] }>(
+        "/repo/upload-spec",
+        form,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      )
+      .then((r) => r.data);
+  },
+
   // ── GitHub ────────────────────────────────────────────────────────────────
   getRepoPRs: (owner: string, repo: string) =>
     apiClient.get("/github/prs", { params: { owner, repo } }).then((r) => r.data as any[]),
@@ -871,6 +1018,11 @@ export const api = {
   getGitDiff: (workspaceId: string, filePath: string) =>
     apiClient.get<{ diff: string }>("/git/diff", { params: { workspace_id: workspaceId, file_path: filePath } }).then((r) => r.data),
 
+  getCommitImpactTree: (workspaceId: string, maxDepth = 4) =>
+    apiClient
+      .get<CommitImpactTreeResponse>("/commit/impact-tree", { params: { workspace_id: workspaceId, max_depth: maxDepth } })
+      .then((r) => r.data),
+
   createBranch: (payload: { workspace_id: string; branch_name: string; from_branch?: string }) =>
     apiClient.post("/git/branch", payload).then((r) => r.data),
 
@@ -929,4 +1081,196 @@ export const api = {
 
   listPipelineRuns: () =>
     apiClient.get<PipelineRunSummary[]>("/pipeline/runs").then((r) => r.data),
+
+  // ── Deployments ──────────────────────────────────────────────────────────
+  getDeploymentHealth: () =>
+    apiClient.get<DeploymentConfigHealth>("/deployments/health").then((r) => r.data),
+
+  getDeploymentRepoOptions: (repoUrl: string, branch?: string) =>
+    apiClient
+      .get<DeploymentRepoOptionsResponse>("/deployments/repo-options", {
+        params: { repo_url: repoUrl, ...(branch ? { branch } : {}) },
+      })
+      .then((r) => r.data),
+
+  triggerDeployment: (payload: DeploymentTriggerRequest) =>
+    apiClient.post<DeploymentTriggerResponse>("/deployments/trigger", payload).then((r) => r.data),
+
+  getDeploymentStatus: (deploymentId: string) =>
+    apiClient.get<DeploymentStatusResponse>(`/deployments/${deploymentId}/status`).then((r) => r.data),
+
+  getDeploymentEvents: (deploymentId: string, limit = 120) =>
+    apiClient
+      .get<DeploymentEventsResponse>(`/deployments/${deploymentId}/events`, { params: { limit } })
+      .then((r) => r.data),
 };
+
+// ─── Code Impact + Test Intelligence Types ────────────────────────────────────
+
+export interface GraphNode {
+  id: string;
+  path: string;
+  name: string;
+  ext: string;
+  is_changed: boolean;
+  is_impacted: boolean;
+  layer: number;
+  layer_index: number;
+  x: number;
+  y: number;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+}
+
+export interface DependencyGraphResponse {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  tree: Record<string, unknown>;
+  changed_files: string[];
+  impacted_files: string[];
+  pr_title?: string;
+  pr_url?: string;
+  commit_message?: string;
+}
+
+export interface ImpactPathResponse {
+  focus_file: string;
+  root_path: string[];
+  leaf_path: string[];
+  full_path: string[];
+  upstream: string[];
+  downstream: string[];
+}
+
+export interface FileContentResponse {
+  path: string;
+  content: string;
+  language: string;
+}
+
+export interface ImpactGeneratedTest {
+  id: string;
+  name: string;
+  description: string;
+  code: string;
+  framework: string;
+  file_target: string;
+  test_type: string;
+  tags: string[];
+}
+
+export interface ImpactPlaywrightStep {
+  action: string;
+  selector: string | null;
+  value: string | null;
+  description: string;
+}
+
+export interface ImpactPlaywrightTest {
+  id: string;
+  analysis_id: string;
+  name: string;
+  description: string;
+  page_name: string;
+  severity: string;
+  steps: ImpactPlaywrightStep[];
+  file_target: string;
+}
+
+export interface GenerateTestsResponse {
+  tests: ImpactGeneratedTest[];
+  framework: string;
+  file_path: string;
+}
+
+export interface DocScenario {
+  id: string;
+  title: string;
+  description: string;
+  acceptance_criteria: string[];
+  priority: string;
+}
+
+export interface ParseDocsResponse {
+  scenarios: DocScenario[];
+  total: number;
+}
+
+export interface GenerateFromDocsResponse {
+  tests: ImpactPlaywrightTest[];
+  total: number;
+}
+
+export interface ImpactTestResult {
+  test_id: string;
+  test_name: string;
+  status: "passed" | "failed" | "skipped";
+  duration_ms: number;
+  error?: string | null;
+  output?: string | null;
+}
+
+export interface RunTestResponse {
+  results: ImpactTestResult[];
+  passed: number;
+  failed: number;
+  total: number;
+  pass_rate: number;
+}
+
+// ─── Code Impact + Test Intelligence API ─────────────────────────────────────
+
+export const impactApi = {
+  buildGraph: (payload: { owner: string; repo: string; pr_number?: number; commit_sha?: string }) =>
+    apiClient.post<DependencyGraphResponse>("/impact/graph", payload).then((r) => r.data),
+
+  getImpactPath: (payload: { nodes: GraphNode[]; edges: GraphEdge[]; focus_file: string }) =>
+    apiClient.post<ImpactPathResponse>("/impact/impact-path", payload).then((r) => r.data),
+
+  getFileContent: (payload: { owner: string; repo: string; path: string; ref?: string }) =>
+    apiClient.post<FileContentResponse>("/impact/file-content", payload).then((r) => r.data),
+
+  generateFromCode: (payload: {
+    owner: string;
+    repo: string;
+    file_path: string;
+    file_content: string;
+    language: string;
+    impact_context?: string[];
+  }) =>
+    apiClient.post<GenerateTestsResponse>("/impact/generate-from-code", payload).then((r) => r.data),
+
+  uploadDoc: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiClient
+      .post<ParseDocsResponse>("/impact/upload-doc", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
+
+  generateFromDocs: (payload: { scenarios: DocScenario[]; framework?: string }) =>
+    apiClient.post<GenerateFromDocsResponse>("/impact/generate-from-docs", payload).then((r) => r.data),
+
+  runTest: (payload: { test_id: string; test_code: string; framework: string; language: string }) =>
+    apiClient.post<RunTestResponse>("/impact/run-tests", payload).then((r) => r.data),
+
+  runAllTests: (testIds: string[]) =>
+    apiClient.post<RunTestResponse>("/impact/run-all-tests", testIds).then((r) => r.data),
+
+  buildWorkspaceGraph: (payload: { workspace_id: string; file_paths?: string[] }) =>
+    apiClient
+      .post<WorkspaceGraphResponse>("/impact/workspace-graph", payload)
+      .then((r) => r.data),
+};
+
+// ─── Workspace Dependency Graph Types ────────────────────────────────────────
+
+export interface WorkspaceGraphResponse {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}

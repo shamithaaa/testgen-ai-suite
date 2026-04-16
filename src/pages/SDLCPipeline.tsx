@@ -3,6 +3,7 @@ import { WorkspaceProvider } from "@/context/WorkspaceContext";
 import { PipelineStageBar } from "@/components/pipeline/PipelineStageBar";
 import { StageWorkspace } from "@/components/pipeline/StageWorkspace";
 import { StageCodeReview } from "@/components/pipeline/StageCodeReview";
+import { StageDeployment } from "@/components/pipeline/StageDeployment";
 import { StageTestRunner } from "@/components/pipeline/StageTestRunner";
 import { StageReport } from "@/components/pipeline/StageReport";
 
@@ -14,8 +15,9 @@ function PipelineContent() {
       <div className="flex-1 min-h-0">
         {activeStage === 1 && <StageWorkspace />}
         {activeStage === 2 && <StageCodeReview />}
-        {activeStage === 3 && <StageTestRunner />}
-        {activeStage === 4 && <StageReport />}
+        {activeStage === 3 && <StageDeployment />}
+        {activeStage === 4 && <StageTestRunner />}
+        {activeStage === 5 && <StageReport />}
       </div>
     </div>
   );

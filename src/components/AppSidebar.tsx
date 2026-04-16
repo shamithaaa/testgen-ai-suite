@@ -12,6 +12,9 @@ import {
   Gauge,
   Code2,
   Workflow,
+  Network,
+  BookOpen,
+  Rocket,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -33,6 +36,9 @@ const pipelineItem = { title: "SDLC Pipeline", url: "/pipeline", icon: Workflow,
 const sdlcTools = [
   { title: "AI Workspace", url: "/workspace", icon: Code2, hint: "Code editor + AI Copilot + Git" },
   { title: "Code Reviewer", url: "/code-review", icon: GitPullRequest, hint: "AI inline PR review" },
+  { title: "Code Impact", url: "/code-impact", icon: Network, hint: "Root→Leaf dependency graph + test gen" },
+  { title: "Deployments", url: "/deployments", icon: Rocket, hint: "Trigger + track Vercel deployments" },
+  { title: "Doc-Driven Tests", url: "/doc-tests", icon: BookOpen, hint: "Upload docs → extract scenarios → run tests" },
   { title: "Live Test Runner", url: "/live-testing", icon: Clapperboard, hint: "Repository → AI → Browser execution" },
   { title: "Defect Prediction", url: "/defect-prediction", icon: Bug, hint: "File risk scoring from git history" },
   { title: "Release Gate", url: "/release-gate", icon: Lock, hint: "Go/no-go release decision" },

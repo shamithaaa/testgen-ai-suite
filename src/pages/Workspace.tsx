@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { Github, Loader2, GitBranch, ChevronDown, ChevronRight, Columns2, PanelRight } from "lucide-react";
+import {
+  Github,
+  Loader2,
+  GitBranch,
+  ChevronDown,
+  ChevronRight,
+  PanelRight,
+  ArrowLeft,
+  GitFork,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +16,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { WorkspaceProvider, useWorkspaceContext } from "@/context/WorkspaceContext";
-import { FileExplorer } from "@/components/workspace/FileExplorer";
+import { ViewEntryTree } from "@/components/workspace/ViewEntryTree";
+import { TreeFlowView } from "@/components/workspace/TreeFlowView";
 import { EditorArea } from "@/components/workspace/EditorArea";
 import { CopilotPanel } from "@/components/workspace/CopilotPanel";
 import { CommitPanel } from "@/components/workspace/CommitPanel";
@@ -15,7 +25,15 @@ import { StatusBar } from "@/components/workspace/StatusBar";
 import { useConnectWorkspace } from "@/hooks/use-workspace";
 import { toast } from "sonner";
 
-function ConnectForm({ initialRepoUrl, initialBranch }: { initialRepoUrl?: string; initialBranch?: string } = {}) {
+// ── Connect form ──────────────────────────────────────────────────────────────
+
+function ConnectForm({
+  initialRepoUrl,
+  initialBranch,
+}: {
+  initialRepoUrl?: string;
+  initialBranch?: string;
+} = {}) {
   const [repoUrl, setRepoUrl] = useState(initialRepoUrl ?? "");
   const [branch, setBranch] = useState(initialBranch ?? "main");
   const [pat, setPat] = useState("");
@@ -25,12 +43,14 @@ function ConnectForm({ initialRepoUrl, initialBranch }: { initialRepoUrl?: strin
 
   const handleConnect = async () => {
     if (!repoUrl.trim()) return;
-    // Normalize URL
     let url = repoUrl.trim();
     if (!url.startsWith("http")) url = `https://github.com/${url}`;
-
     try {
-      const result = await connectMutation.mutateAsync({ github_url: url, branch, pat: pat || undefined });
+      const result = await connectMutation.mutateAsync({
+        github_url: url,
+        branch,
+        pat: pat || undefined,
+      });
       setWorkspace(result);
       toast.success("Repository connected");
     } catch (err: any) {
@@ -58,7 +78,9 @@ function ConnectForm({ initialRepoUrl, initialBranch }: { initialRepoUrl?: strin
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
               placeholder="owner/repo  or  https://github.com/owner/repo"
-              onKeyDown={(e) => { if (e.key === "Enter") handleConnect(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleConnect();
+              }}
             />
           </div>
 
@@ -78,7 +100,11 @@ function ConnectForm({ initialRepoUrl, initialBranch }: { initialRepoUrl?: strin
           <Collapsible open={showPat} onOpenChange={setShowPat}>
             <CollapsibleTrigger asChild>
               <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                {showPat ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                {showPat ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
                 Personal Access Token (for private repos)
               </button>
             </CollapsibleTrigger>
@@ -102,43 +128,92 @@ function ConnectForm({ initialRepoUrl, initialBranch }: { initialRepoUrl?: strin
           className="w-full"
           disabled={connectMutation.isPending || !repoUrl.trim()}
         >
-          {connectMutation.isPending
-            ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cloning repository…</>
-            : <><Github className="h-4 w-4 mr-2" />Connect & Clone</>
-          }
+          {connectMutation.isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Cloning repository…
+            </>
+          ) : (
+            <>
+              <Github className="h-4 w-4 mr-2" />
+              Connect & Clone
+            </>
+          )}
         </Button>
 
         <p className="text-[11px] text-center text-muted-foreground">
-          Repository is shallow-cloned (depth 1) into a temporary workspace.
-          Changes are committed and pushed to GitHub on your behalf.
+          Repository is shallow-cloned (depth 1) into a temporary workspace. Changes are
+          committed and pushed to GitHub on your behalf.
         </p>
       </div>
     </div>
   );
 }
 
+// ── Workspace layout ──────────────────────────────────────────────────────────
+
 interface WorkspaceLayoutProps {
   onCommitSuccess?: (sha: string, url: string) => void;
+  onTestsGenerated?: (tests: import("@/lib/api").WorkspacePlaywrightTest[]) => void;
   initialRepoUrl?: string;
   initialBranch?: string;
 }
 
-export function WorkspaceLayout({ onCommitSuccess, initialRepoUrl, initialBranch }: WorkspaceLayoutProps = {}) {
+export function WorkspaceLayout({
+  onCommitSuccess,
+  onTestsGenerated,
+  initialRepoUrl,
+  initialBranch,
+}: WorkspaceLayoutProps = {}) {
   const { workspace } = useWorkspaceContext();
   const [showCommit, setShowCommit] = useState(false);
+  const [treeRefreshNonce, setTreeRefreshNonce] = useState(0);
+  /** "code" → EditorArea in center | "tree" → TreeFlowView in center */
+  const [centerMode, setCenterMode] = useState<"code" | "tree">("code");
 
-  if (!workspace) return <ConnectForm initialRepoUrl={initialRepoUrl} initialBranch={initialBranch} />;
+  if (!workspace)
+    return <ConnectForm initialRepoUrl={initialRepoUrl} initialBranch={initialBranch} />;
+
+  const isTreeMode = centerMode === "tree";
 
   return (
     <div className="flex flex-col h-full">
-      {/* Top toolbar */}
+      {/* ── Top toolbar ── */}
       <div className="h-9 border-b border-border/50 bg-muted/20 flex items-center px-3 gap-2 flex-shrink-0">
         <span className="text-xs text-muted-foreground truncate max-w-[200px]">
           {workspace.repo_url.split("/").slice(-2).join("/")}
         </span>
         <span className="text-muted-foreground/40 text-xs">·</span>
         <span className="text-xs text-muted-foreground">{workspace.branch}</span>
+
         <div className="ml-auto flex items-center gap-2">
+          {isTreeMode ? (
+            /* Back to code view */
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2"
+              onClick={() => setCenterMode("code")}
+            >
+              <ArrowLeft className="h-3 w-3 mr-1" />
+              Back to Code View
+            </Button>
+          ) : (
+            /* Switch to tree view — also refresh the impact tree */
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2"
+              onClick={() => {
+                setTreeRefreshNonce((v) => v + 1);
+                setCenterMode("tree");
+              }}
+            >
+              <GitFork className="h-3 w-3 mr-1" />
+              View in Tree
+            </Button>
+          )}
+
           <Button
             variant={showCommit ? "default" : "outline"}
             size="sm"
@@ -151,33 +226,52 @@ export function WorkspaceLayout({ onCommitSuccess, initialRepoUrl, initialBranch
         </div>
       </div>
 
-      {/* Main 3-column layout */}
+      {/* ── Main panels ── */}
       <div className="flex-1 min-h-0">
         <ResizablePanelGroup direction="horizontal" className="h-full">
-          {/* File explorer */}
-          <ResizablePanel defaultSize={18} minSize={12} maxSize={30} className="border-r border-border/50">
-            <FileExplorer />
+
+          {/* Left panel: Impact tree — always visible */}
+          <ResizablePanel
+            defaultSize={18}
+            minSize={12}
+            maxSize={30}
+            className="border-r border-border/50"
+          >
+            <ViewEntryTree refreshNonce={treeRefreshNonce} />
           </ResizablePanel>
 
           <ResizableHandle />
 
-          {/* Editor area */}
-          <ResizablePanel defaultSize={showCommit ? 45 : 57}>
-            <EditorArea />
+          {/* Center panel: code editor OR flow visualization */}
+          <ResizablePanel defaultSize={isTreeMode ? (showCommit ? 68 : 82) : (showCommit ? 44 : 57)}>
+            {isTreeMode ? (
+              <TreeFlowView
+                onBackToCode={() => setCenterMode("code")}
+                onTestsGenerated={onTestsGenerated}
+              />
+            ) : <EditorArea />}
           </ResizablePanel>
 
-          <ResizableHandle />
+          {/* Copilot panel — hidden in tree mode */}
+          {!isTreeMode && (
+            <>
+              <ResizableHandle />
+              <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+                <CopilotPanel />
+              </ResizablePanel>
+            </>
+          )}
 
-          {/* Copilot panel */}
-          <ResizablePanel defaultSize={showCommit ? 25 : 25} minSize={20} maxSize={40}>
-            <CopilotPanel />
-          </ResizablePanel>
-
-          {/* Commit panel (slide-in) */}
+          {/* Commit panel (optional slide-in) */}
           {showCommit && (
             <>
               <ResizableHandle />
-              <ResizablePanel defaultSize={14} minSize={12} maxSize={22} className="border-l border-border/50">
+              <ResizablePanel
+                defaultSize={14}
+                minSize={12}
+                maxSize={22}
+                className="border-l border-border/50"
+              >
                 <div className="h-full flex flex-col">
                   <div className="px-3 py-2 border-b border-border/50 flex-shrink-0">
                     <p className="text-xs font-medium">Commit & Push</p>

@@ -16,6 +16,13 @@ class Settings(BaseSettings):
 
     # GitHub
     GITHUB_TOKEN: str = ""
+    GITHUB_REPO_ID: str = ""
+
+    # Vercel Deployments
+    VERCEL_TOKEN: str = ""
+    VERCEL_TEAM_ID: str = ""
+    VERCEL_PROJECT_ID: str = ""
+    VERCEL_PROJECT_NAME: str = ""
 
     # Jira
     JIRA_DOMAIN: str = "https://joulestowatts-balaji-testing.atlassian.net?continue=https%3A%2F%2Fjoulestowatts-balaji-testing.atlassian.net%2Fwelcome%2Fsoftware&atlOrigin=eyJpIjoiNzdiZjMxYTJjNjBmNGNjOTgwZDAwNjg5NWZhYmNmOWUiLCJwIjoiaiJ9"

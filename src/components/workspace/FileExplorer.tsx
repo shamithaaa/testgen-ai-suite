@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronRight, ChevronDown,
   FileCode, FileText, FileJson, Folder, FolderOpen, RefreshCw,
@@ -55,10 +55,17 @@ interface FileTreeNodeProps {
   depth?: number;
   activeFile: string | null;
   statusMap: Record<string, FileStatus>;
+  revealDirs: Set<string>;
 }
 
-function FileTreeNode({ node, depth = 0, activeFile, statusMap }: FileTreeNodeProps) {
-  const [expanded, setExpanded] = useState(depth < 1);
+function FileTreeNode({ node, depth = 0, activeFile, statusMap, revealDirs }: FileTreeNodeProps) {
+  const shouldReveal = node.type === "directory" && revealDirs.has(node.path);
+  const [expanded, setExpanded] = useState(depth < 1 || shouldReveal);
+
+  // Expand when a new path is revealed (e.g. switching back from tree mode)
+  useEffect(() => {
+    if (shouldReveal) setExpanded(true);
+  }, [shouldReveal]);
   const { workspace, openFile } = useWorkspaceContext();
 
   const handleFileClick = async () => {
@@ -107,6 +114,7 @@ function FileTreeNode({ node, depth = 0, activeFile, statusMap }: FileTreeNodePr
             depth={depth + 1}
             activeFile={activeFile}
             statusMap={statusMap}
+            revealDirs={revealDirs}
           />
         ))}
       </div>
@@ -160,8 +168,20 @@ function TreeSkeleton() {
 
 // ── FileExplorer ─────────────────────────────────────────────────────────────
 
-export function FileExplorer() {
+export function FileExplorer({ revealPath }: { revealPath?: string | null } = {}) {
   const { workspace, activeTab } = useWorkspaceContext();
+
+  // Compute the set of directory paths that need to be force-expanded to reveal revealPath
+  const revealDirs = useMemo<Set<string>>(() => {
+    const target = revealPath ?? activeTab;
+    if (!target) return new Set();
+    const parts = target.split("/");
+    const dirs = new Set<string>();
+    for (let i = 1; i < parts.length; i++) {
+      dirs.add(parts.slice(0, i).join("/"));
+    }
+    return dirs;
+  }, [revealPath, activeTab]);
 
   const treeQuery = useWorkspaceTree(workspace?.workspace_id ?? null);
   const gitStatusQuery = useGitStatus(workspace?.workspace_id ?? null);
@@ -242,6 +262,7 @@ export function FileExplorer() {
               depth={0}
               activeFile={activeTab}
               statusMap={statusMap}
+              revealDirs={revealDirs}
             />
           ))
         )}

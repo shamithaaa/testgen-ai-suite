@@ -1,0 +1,167 @@
+- generic [ref=e4]:
+  - generic [ref=e8]:
+    - generic [ref=e10]:
+      - img "SDLC logo" [ref=e12]
+      - generic [ref=e13]:
+        - heading "SDLC" [level=2] [ref=e14]
+        - paragraph [ref=e15]: AI-Powered SDLC Platform
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]: Overview
+        - list [ref=e20]:
+          - listitem [ref=e21]:
+            - link "Dashboard" [ref=e22] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e24]
+              - generic [ref=e29]: Dashboard
+      - generic [ref=e30]:
+        - generic [ref=e31]: Pipeline
+        - list [ref=e33]:
+          - listitem [ref=e34]:
+            - link "SDLC Pipeline Workspace → Commit → Review → Tests → Report" [ref=e35] [cursor=pointer]:
+              - /url: /pipeline
+              - img [ref=e37]
+              - generic [ref=e41]:
+                - generic [ref=e42]: SDLC Pipeline
+                - generic [ref=e43]: Workspace → Commit → Review → Tests → Report
+      - generic [ref=e44]:
+        - generic [ref=e45]: SDLC Tools
+        - list [ref=e47]:
+          - listitem [ref=e48]:
+            - link "AI Workspace Code editor + AI Copilot + Git" [ref=e49] [cursor=pointer]:
+              - /url: /workspace
+              - img [ref=e51]
+              - generic [ref=e55]:
+                - generic [ref=e56]: AI Workspace
+                - generic [ref=e57]: Code editor + AI Copilot + Git
+          - listitem [ref=e58]:
+            - link "Code Reviewer AI inline PR review" [ref=e59] [cursor=pointer]:
+              - /url: /code-review
+              - img [ref=e61]
+              - generic [ref=e65]:
+                - generic [ref=e66]: Code Reviewer
+                - generic [ref=e67]: AI inline PR review
+          - listitem [ref=e68]:
+            - link "Code Impact Root→Leaf dependency graph + test gen" [ref=e69] [cursor=pointer]:
+              - /url: /code-impact
+              - img [ref=e71]
+              - generic [ref=e76]:
+                - generic [ref=e77]: Code Impact
+                - generic [ref=e78]: Root→Leaf dependency graph + test gen
+          - listitem [ref=e79]:
+            - link "Deployments Trigger + track Vercel deployments" [ref=e80] [cursor=pointer]:
+              - /url: /deployments
+              - img [ref=e82]
+              - generic [ref=e87]:
+                - generic [ref=e88]: Deployments
+                - generic [ref=e89]: Trigger + track Vercel deployments
+          - listitem [ref=e90]:
+            - link "Doc-Driven Tests Upload docs → extract scenarios → run tests" [ref=e91] [cursor=pointer]:
+              - /url: /doc-tests
+              - img [ref=e93]
+              - generic [ref=e95]:
+                - generic [ref=e96]: Doc-Driven Tests
+                - generic [ref=e97]: Upload docs → extract scenarios → run tests
+          - listitem [ref=e98]:
+            - link "Live Test Runner Repository → AI → Browser execution" [ref=e99] [cursor=pointer]:
+              - /url: /live-testing
+              - img [ref=e101]
+              - generic [ref=e106]:
+                - generic [ref=e107]: Live Test Runner
+                - generic [ref=e108]: Repository → AI → Browser execution
+          - listitem [ref=e109]:
+            - link "Defect Prediction File risk scoring from git history" [ref=e110] [cursor=pointer]:
+              - /url: /defect-prediction
+              - img [ref=e112]
+              - generic [ref=e121]:
+                - generic [ref=e122]: Defect Prediction
+                - generic [ref=e123]: File risk scoring from git history
+          - listitem [ref=e124]:
+            - link "Release Gate Go/no-go release decision" [ref=e125] [cursor=pointer]:
+              - /url: /release-gate
+              - img [ref=e127]
+              - generic [ref=e130]:
+                - generic [ref=e131]: Release Gate
+                - generic [ref=e132]: Go/no-go release decision
+          - listitem [ref=e133]:
+            - link "Monitoring Anomaly detection & predictive alerts" [ref=e134] [cursor=pointer]:
+              - /url: /monitoring
+              - img [ref=e136]
+              - generic [ref=e139]:
+                - generic [ref=e140]: Monitoring
+                - generic [ref=e141]: Anomaly detection & predictive alerts
+      - generic [ref=e142]:
+        - generic [ref=e143]:
+          - generic [ref=e144]: Beta / In Progress
+          - generic [ref=e145]: Coming soon
+        - list [ref=e147]:
+          - listitem [ref=e148]:
+            - link "Requirements Beta · In Progress" [ref=e149] [cursor=pointer]:
+              - /url: /requirements
+              - img [ref=e151]
+              - generic [ref=e154]:
+                - generic [ref=e155]: Requirements
+                - generic [ref=e156]: Beta · In Progress
+          - listitem [ref=e157]:
+            - link "Test Suite Beta · In Progress" [ref=e158] [cursor=pointer]:
+              - /url: /generated-tests
+              - img [ref=e160]
+              - generic [ref=e163]:
+                - generic [ref=e164]: Test Suite
+                - generic [ref=e165]: Beta · In Progress
+          - listitem [ref=e166]:
+            - link "Test Execution Beta · In Progress" [ref=e167] [cursor=pointer]:
+              - /url: /test-execution
+              - img [ref=e169]
+              - generic [ref=e171]:
+                - generic [ref=e172]: Test Execution
+                - generic [ref=e173]: Beta · In Progress
+          - listitem [ref=e174]:
+            - link "Risk Ranking Beta · In Progress" [ref=e175] [cursor=pointer]:
+              - /url: /prioritization
+              - img [ref=e177]
+              - generic [ref=e180]:
+                - generic [ref=e181]: Risk Ranking
+                - generic [ref=e182]: Beta · In Progress
+          - listitem [ref=e183]:
+            - link "Synthetic Data Beta · In Progress" [ref=e184] [cursor=pointer]:
+              - /url: /synthetic-data
+              - img [ref=e186]
+              - generic [ref=e190]:
+                - generic [ref=e191]: Synthetic Data
+                - generic [ref=e192]: Beta · In Progress
+  - generic [ref=e193]:
+    - banner [ref=e194]:
+      - button "Toggle Sidebar" [ref=e196] [cursor=pointer]:
+        - img
+        - generic [ref=e197]: Toggle Sidebar
+      - generic [ref=e198]:
+        - button [active] [ref=e199] [cursor=pointer]:
+          - img
+        - button "My Workspace" [ref=e200] [cursor=pointer]:
+          - generic [ref=e201]: My Workspace
+          - img [ref=e202]
+        - img [ref=e205]
+    - main [ref=e208]:
+      - generic [ref=e210]:
+        - generic [ref=e211]:
+          - img [ref=e213]
+          - heading "Connect Repository" [level=2] [ref=e216]
+          - paragraph [ref=e217]: Enter a GitHub repository to start coding with AI assistance
+        - generic [ref=e218]:
+          - generic [ref=e219]:
+            - text: Repository URL or owner/repo
+            - textbox "owner/repo or https://github.com/owner/repo" [ref=e220]:
+              - /placeholder: owner/repo  or  https://github.com/owner/repo
+          - generic [ref=e221]:
+            - text: Branch
+            - generic [ref=e222]:
+              - img [ref=e223]
+              - textbox "main" [ref=e227]
+          - button "Personal Access Token (for private repos)" [ref=e229] [cursor=pointer]:
+            - img [ref=e230]
+            - text: Personal Access Token (for private repos)
+        - button "Connect & Clone" [disabled]:
+          - img
+          - text: Connect & Clone
+        - paragraph [ref=e232]: Repository is shallow-cloned (depth 1) into a temporary workspace. Changes are committed and pushed to GitHub on your behalf.

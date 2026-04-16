@@ -18,9 +18,12 @@ import RequirementsIntelligence from "./pages/RequirementsIntelligence";
 import SprintIntelligence from "./pages/SprintIntelligence";
 import Workspace from "./pages/Workspace";
 import SDLCPipeline from "./pages/SDLCPipeline";
+import CodeImpact from "./pages/CodeImpact";
+import DocTests from "./pages/DocTests";
 import NotFound from "./pages/NotFound";
 import DashboardLayout from "@/components/DashboardLayout";
 import UserProfile from "./pages/UserProfile";
+import Deployments from "./pages/Deployments.tsx";
 
 function App() {
   return (
@@ -46,6 +49,10 @@ function App() {
           <Route path="/sprint-intelligence" element={<SprintIntelligence />} />
           <Route path="/workspace" element={<Workspace />} />
           <Route path="/pipeline" element={<SDLCPipeline />} />
+          <Route path="/deployments" element={<Deployments />} />
+          {/* Code Impact + Test Intelligence (Plan.md Flow 1 & 2) */}
+          <Route path="/code-impact" element={<CodeImpact />} />
+          <Route path="/doc-tests" element={<DocTests />} />
           {/* New user profile route */}
           <Route path="/profile" element={<UserProfile />} />
         </Route>

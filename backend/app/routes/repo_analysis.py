@@ -7,12 +7,16 @@ GET  /repo/analyses/{id}                 — fetch a saved analysis
 GET  /repo/analyses/{id}/tests           — list generated tests for an analysis
 POST /repo/analyses/{id}/execute         — run tests live with Playwright
 GET  /repo/execution/{run_id}            — poll live execution results (with screenshots)
+POST /repo/execute-direct                — run tests directly (no analysis needed)
+POST /repo/upload-spec                   — parse a .spec.ts file into test cases
 """
 import asyncio
+import re
+import uuid
 import httpx
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Body, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Body, File, Form, HTTPException, UploadFile
 
 from app.database import get_db
 from app.models.repo_analysis import RepoAnalysisRequest
@@ -248,3 +252,187 @@ async def get_run_detail(run_id: str):
         raise HTTPException(status_code=404, detail="Run not found")
     run.pop("_id", None)
     return run
+
+
+# ── Direct execution (skip analysis — use provided tests) ─────────────────────
+
+@router.post("/execute-direct", status_code=202)
+async def execute_tests_direct(body: dict = Body(...), background_tasks: BackgroundTasks = None):
+    """
+    Run a list of test cases directly against a target URL without going through
+    the analysis pipeline. Useful when tests are already committed or uploaded.
+    """
+    tests = body.get("tests", [])
+    target_url = body.get("target_url", "").strip()
+
+    if not tests:
+        raise HTTPException(status_code=400, detail="tests list is required")
+    if not target_url:
+        raise HTTPException(status_code=400, detail="target_url is required")
+
+    reach_err = await _check_url_reachable(target_url)
+    if reach_err:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Target URL is not reachable: {reach_err}. "
+                f"Make sure your app is running at {target_url} and is accessible from this server."
+            ),
+        )
+
+    run_id = str(uuid.uuid4())
+    analysis_id = f"direct-{run_id}"
+
+    prepared: list[dict] = []
+    for t in tests:
+        doc = dict(t)
+        doc.setdefault("id", str(uuid.uuid4()))
+        doc["analysis_id"] = analysis_id
+        prepared.append(doc)
+
+    background_tasks.add_task(
+        playwright_service.execute_playwright_tests,
+        prepared,
+        target_url,
+        run_id,
+        analysis_id,
+    )
+
+    return {"run_id": run_id, "total": len(prepared), "status": "started"}
+
+
+# ── Spec file upload + parse ──────────────────────────────────────────────────
+
+def _parse_block_to_steps(block: str) -> list[dict]:
+    """Convert a Playwright test body into our internal step format."""
+    steps: list[dict] = []
+
+    for line in block.splitlines():
+        line = line.strip()
+        if not line or line in ("{", "}"):
+            continue
+
+        # page.goto
+        m = re.search(r"await page\.goto\s*\(\s*['\"]([^'\"]+)['\"]", line)
+        if m:
+            steps.append({"action": "navigate", "selector": None, "value": m.group(1),
+                          "description": f"Navigate to {m.group(1)}"})
+            continue
+
+        # page.fill
+        m = re.search(r"await page\.fill\s*\(\s*['\"]([^'\"]+)['\"],\s*['\"]([^'\"]*)['\"]", line)
+        if m:
+            steps.append({"action": "fill", "selector": m.group(1), "value": m.group(2),
+                          "description": f"Fill '{m.group(1)}' with '{m.group(2)}'"})
+            continue
+
+        # page.type
+        m = re.search(r"await page\.type\s*\(\s*['\"]([^'\"]+)['\"],\s*['\"]([^'\"]*)['\"]", line)
+        if m:
+            steps.append({"action": "type_into", "selector": m.group(1), "value": m.group(2),
+                          "description": f"Type into '{m.group(1)}'"})
+            continue
+
+        # page.selectOption
+        m = re.search(r"await page\.selectOption\s*\(\s*['\"]([^'\"]+)['\"],\s*['\"]([^'\"]*)['\"]", line)
+        if m:
+            steps.append({"action": "select_option", "selector": m.group(1), "value": m.group(2),
+                          "description": f"Select '{m.group(2)}' in '{m.group(1)}'"})
+            continue
+
+        # page.click
+        m = re.search(r"await page\.click\s*\(\s*['\"]([^'\"]+)['\"]", line)
+        if m:
+            steps.append({"action": "click", "selector": m.group(1), "value": None,
+                          "description": f"Click '{m.group(1)}'"})
+            continue
+
+        # expect(...).toContainText
+        m = re.search(r"\.toContainText\s*\(\s*['\"]([^'\"]+)['\"]", line)
+        if m:
+            steps.append({"action": "assert_text", "selector": "body", "value": m.group(1),
+                          "description": f"Assert page contains '{m.group(1)}'"})
+            continue
+
+        # page.waitForTimeout
+        m = re.search(r"waitForTimeout\s*\(\s*(\d+)\s*\)", line)
+        if m:
+            ms = int(m.group(1))
+            steps.append({"action": "wait", "selector": None, "value": str(max(1, ms // 1000)),
+                          "description": f"Wait {ms} ms"})
+            continue
+
+        # page.screenshot
+        if re.search(r"await page\.screenshot\s*\(", line):
+            steps.append({"action": "screenshot", "selector": None, "value": None,
+                          "description": "Take screenshot"})
+            continue
+
+    return steps
+
+
+def _parse_spec_to_tests(spec_content: str, filename: str) -> list[dict]:
+    """Parse a .spec.ts file and return a list of internal test-case dicts."""
+    tests: list[dict] = []
+    test_decl_re = re.compile(r"test\s*\(\s*['\"]([^'\"]+)['\"]")
+
+    for match in test_decl_re.finditer(spec_content):
+        name = match.group(1)
+        brace_start = spec_content.find("{", match.end())
+        if brace_start == -1:
+            continue
+
+        depth = 0
+        brace_end = brace_start
+        for i in range(brace_start, len(spec_content)):
+            if spec_content[i] == "{":
+                depth += 1
+            elif spec_content[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    brace_end = i
+                    break
+
+        block = spec_content[brace_start : brace_end + 1]
+        steps = _parse_block_to_steps(block)
+
+        # Use first comment in block as description
+        comment_m = re.search(r"//\s*(.+)", block)
+        description = comment_m.group(1).strip() if comment_m else f"Test: {name}"
+
+        tests.append({
+            "id": str(uuid.uuid4()),
+            "analysis_id": "uploaded",
+            "name": name,
+            "description": description,
+            "page_name": filename,
+            "severity": "Medium",
+            "steps": steps,
+        })
+
+    return tests
+
+
+@router.post("/upload-spec")
+async def upload_spec(file: UploadFile = File(...)):
+    """
+    Parse a Playwright .spec.ts file and return structured test cases.
+    The returned tests can be passed to POST /repo/execute-direct to run them.
+    """
+    if not file.filename or not file.filename.endswith((".ts", ".js", ".spec.ts", ".spec.js")):
+        raise HTTPException(status_code=400, detail="Please upload a .spec.ts or .spec.js file")
+
+    raw = await file.read()
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be valid UTF-8 text")
+
+    tests = _parse_spec_to_tests(content, file.filename)
+    if not tests:
+        raise HTTPException(
+            status_code=400,
+            detail="No test() blocks found in the uploaded file. Make sure it contains Playwright test cases."
+        )
+
+    return {"filename": file.filename, "test_count": len(tests), "tests": tests}

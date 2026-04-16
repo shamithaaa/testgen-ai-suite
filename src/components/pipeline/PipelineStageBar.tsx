@@ -1,22 +1,24 @@
-import { Check, GitPullRequest, Play, BarChart3, ChevronRight, Code2 } from "lucide-react";
+import { Check, GitPullRequest, Play, BarChart3, ChevronRight, Code2, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePipelineContext } from "@/context/PipelineContext";
 
 const STAGES = [
   { n: 1, label: "Workspace",   icon: Code2,          short: "Edit & commit" },
   { n: 2, label: "Code Review", icon: GitPullRequest, short: "AI review" },
-  { n: 3, label: "Live Tests",  icon: Play,           short: "Execute tests" },
-  { n: 4, label: "Report",      icon: BarChart3,      short: "GO / NO-GO" },
+  { n: 3, label: "Deploy",      icon: Rocket,         short: "Ship commit" },
+  { n: 4, label: "Live Tests",  icon: Play,           short: "Execute tests" },
+  { n: 5, label: "Report",      icon: BarChart3,      short: "GO / NO-GO" },
 ];
 
 export function PipelineStageBar() {
-  const { activeStage, completedStages, repoUrl, commitSha, reviewResult, liveTestSummary, reportResult, goToStage } = usePipelineContext();
+  const { activeStage, completedStages, repoUrl, commitSha, reviewResult, deployedUrl, liveTestSummary, reportResult, goToStage } = usePipelineContext();
 
   function stageBadge(n: number): string | null {
     if (n === 1 && commitSha) return commitSha.slice(0, 7);
     if (n === 2 && reviewResult) return `${reviewResult.review.findings?.length ?? 0} findings`;
-    if (n === 3 && liveTestSummary) return `${liveTestSummary.passed}/${liveTestSummary.total} passed`;
-    if (n === 4 && reportResult) return `${reportResult.score}/100`;
+    if (n === 3 && deployedUrl) return "READY";
+    if (n === 4 && liveTestSummary) return `${liveTestSummary.passed}/${liveTestSummary.total} passed`;
+    if (n === 5 && reportResult) return `${reportResult.score}/100`;
     return null;
   }
 

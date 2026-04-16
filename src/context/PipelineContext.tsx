@@ -23,6 +23,8 @@ export interface PipelineState {
   // Stage 3 — Code Review
   reviewResult: { sha: string; review: PipelineReview; files_reviewed: number } | null;
   reviewStatus: "idle" | "loading" | "done" | "error";
+  // Stage 3 — Deployment
+  deployedUrl: string | null;
   // Stage 4 — Test Case Gen
   testSuite: WorkspacePlaywrightTest[];
   // Stage 5 — Live Test Runner
@@ -39,6 +41,7 @@ interface PipelineCtxValue extends PipelineState {
   setCommit: (sha: string, message: string, url: string) => void;
   setReviewResult: (result: PipelineState["reviewResult"]) => void;
   setReviewStatus: (s: PipelineState["reviewStatus"]) => void;
+  setDeployedUrl: (url: string | null) => void;
   setTestSuite: (tests: WorkspacePlaywrightTest[]) => void;
   setLiveTestSummary: (s: LiveTestSummary | null) => void;
   setReportResult: (r: PipelineReport | null) => void;
@@ -54,6 +57,7 @@ const defaultState: PipelineState = {
   branch: "main", workspaceId: null,
   commitSha: null, commitMessage: null, commitUrl: null,
   reviewResult: null, reviewStatus: "idle",
+  deployedUrl: null,
   testSuite: [],
   liveTestSummary: null,
   reportResult: null,
@@ -84,6 +88,10 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 
   const setReviewStatus = useCallback((reviewStatus: PipelineState["reviewStatus"]) => {
     update({ reviewStatus });
+  }, [update]);
+
+  const setDeployedUrl = useCallback((deployedUrl: string | null) => {
+    update({ deployedUrl });
   }, [update]);
 
   const setTestSuite = useCallback((testSuite: WorkspacePlaywrightTest[]) => {
@@ -119,6 +127,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       ...state,
       setWorkspaceInfo, setCommit,
       setReviewResult, setReviewStatus,
+      setDeployedUrl,
       setTestSuite, setLiveTestSummary, setReportResult,
       goToStage, completeStage, resetPipeline,
     }}>

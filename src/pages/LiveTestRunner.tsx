@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Github,
@@ -36,6 +36,9 @@ import {
   ExternalLink,
   Hash,
   Download,
+  Upload,
+  FileCode,
+  FlaskConical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -590,22 +593,218 @@ const TEST_TYPE_CHIPS = [
   { label: "Error Handling", icon: Bug, desc: "Error pages, failure states, 404s" },
 ];
 
+// ── Upload Spec Panel ─────────────────────────────────────────────────────────
+
+function UploadSpecPanel({
+  onUpload,
+  isParsing,
+  errorMsg,
+  initialAppUrl,
+}: {
+  onUpload: (file: File, targetUrl: string, email?: string, password?: string) => void;
+  isParsing: boolean;
+  errorMsg: string | null;
+  initialAppUrl?: string;
+}) {
+  const [targetUrl, setTargetUrl] = useState(initialAppUrl ?? "https://simple-tasks-zeta.vercel.app/");
+  const [testEmail, setTestEmail] = useState("balaji0707srp@gmail.com");
+  const [testPassword, setTestPassword] = useState("1234567890");
+  const [showPassword, setShowPassword] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const isLocalhost = targetUrl.includes("localhost") || targetUrl.includes("127.0.0.1");
+  const canRun = selectedFile && targetUrl.trim().startsWith("http") && !isParsing;
+
+  const handleFile = (f: File) => {
+    if (f.name.endsWith(".ts") || f.name.endsWith(".js")) {
+      setSelectedFile(f);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-5">
+      <Card className="rounded-2xl border-border/50 shadow-sm">
+        <CardHeader className="pb-0">
+          <div className="flex items-start gap-3">
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-shrink-0">
+              <Upload className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-xl">Upload Spec File</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Upload an existing <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">.spec.ts</code> file. Tests will be parsed and run directly — no AI generation needed.
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-6 space-y-5">
+          {errorMsg && (
+            <div className="flex items-start gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3">
+              <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-red-400">{errorMsg}</p>
+            </div>
+          )}
+
+          {/* Drop zone */}
+          <div
+            className={`relative rounded-xl border-2 border-dashed transition-colors cursor-pointer ${
+              dragOver
+                ? "border-primary bg-primary/5"
+                : selectedFile
+                ? "border-green-500/50 bg-green-500/5"
+                : "border-border/50 hover:border-primary/40 hover:bg-muted/20"
+            }`}
+            onClick={() => fileRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+          >
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".ts,.js,.spec.ts,.spec.js"
+              className="sr-only"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+            />
+            <div className="flex flex-col items-center gap-3 py-8 px-4 text-center">
+              {selectedFile ? (
+                <>
+                  <div className="h-12 w-12 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center">
+                    <FileCode className="h-6 w-6 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-green-400">{selectedFile.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{(selectedFile.size / 1024).toFixed(1)} KB — click to change</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="h-12 w-12 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center">
+                    <Upload className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Drop your spec file here</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      or click to browse — <code className="font-mono">.spec.ts</code> / <code className="font-mono">.spec.js</code>
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Target URL */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <Globe className="h-3.5 w-3.5" /> Target App URL
+            </label>
+            <Input
+              placeholder="https://your-app.vercel.app"
+              value={targetUrl}
+              onChange={(e) => setTargetUrl(e.target.value)}
+              disabled={isParsing}
+              className="h-10"
+            />
+            {isLocalhost && targetUrl.trim().length > 10 ? (
+              <div className="flex items-start gap-1.5 rounded bg-yellow-500/10 border border-yellow-500/20 px-2 py-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                <p className="text-[11px] text-yellow-300 leading-snug">
+                  Playwright runs <strong>inside the backend</strong>. Your app must be accessible from this machine.
+                </p>
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">The app must be running and accessible from this server.</p>
+            )}
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-border/50 bg-card/30 p-3">
+            <p className="text-xs font-medium text-foreground/90">Test Credentials (if login is required)</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <Input
+                type="email"
+                placeholder="qa-user@example.com"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                disabled={isParsing}
+                className="h-10"
+              />
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  value={testPassword}
+                  onChange={(e) => setTestPassword(e.target.value)}
+                  disabled={isParsing}
+                  className="h-10 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  <Eye className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Credentials are inserted into matching username/email/password fill steps before execution.
+            </p>
+          </div>
+
+          <Button
+            className="w-full"
+            size="lg"
+            disabled={!canRun}
+            onClick={() => selectedFile && onUpload(selectedFile, targetUrl.trim(), testEmail || undefined, testPassword || undefined)}
+          >
+            {isParsing ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Parsing spec file…</>
+            ) : (
+              <><FlaskConical className="h-4 w-4 mr-2" />Parse &amp; Preview Tests</>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
 // ── Phase: Input form ─────────────────────────────────────────────────────────
 
 function InputPhase({
   onAnalyze,
+  onUploadSpec,
   isAnalyzing,
+  isParsing,
   errorMsg,
+  initialGithubUrl,
+  initialAppUrl,
 }: {
   onAnalyze: (
     github: string, target: string, email?: string, password?: string, preferences?: string,
     numTests?: number, mode?: "full" | "commit", commitSha?: string, commitMessage?: string,
   ) => void;
+  onUploadSpec: (file: File, targetUrl: string, email?: string, password?: string) => void;
   isAnalyzing: boolean;
+  isParsing: boolean;
   errorMsg: string | null;
+  initialGithubUrl?: string;
+  initialAppUrl?: string;
 }) {
-  const [githubUrl, setGithubUrl] = useState("https://github.com/balaji-joulestowatts/simple-tasks");
-  const [targetUrl, setTargetUrl] = useState("https://simple-tasks-zeta.vercel.app/");
+  const [inputMode, setInputMode] = useState<"ai" | "upload">("ai");
+  const [githubUrl, setGithubUrl] = useState(initialGithubUrl ?? "https://github.com/balaji-joulestowatts/simple-tasks");
+  const [targetUrl, setTargetUrl] = useState(initialAppUrl ?? "https://simple-tasks-zeta.vercel.app/");
   const [testEmail, setTestEmail] = useState("balaji0707srp@gmail.com");
   const [testPassword, setTestPassword] = useState("1234567890");
   const [showPassword, setShowPassword] = useState(false);
@@ -654,12 +853,61 @@ function InputPhase({
     targetUrl.trim().startsWith("http") &&
     (testingScope === "full" || selectedCommit !== null);
 
+  // Upload mode — render separate panel
+  if (inputMode === "upload") {
+    return (
+      <div className="space-y-4">
+        {/* Mode toggle */}
+        <div className="max-w-6xl mx-auto flex justify-center">
+          <div className="flex rounded-lg border border-border/50 bg-background/50 p-0.5 gap-0.5">
+            <button
+              onClick={() => setInputMode("ai")}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+            >
+              <Play className="h-3 w-3" /> AI Generation
+            </button>
+            <button
+              onClick={() => setInputMode("upload")}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-medium bg-primary text-primary-foreground shadow-sm transition-colors"
+            >
+              <Upload className="h-3 w-3" /> Upload Spec File
+            </button>
+          </div>
+        </div>
+        <UploadSpecPanel
+          onUpload={onUploadSpec}
+          isParsing={isParsing}
+          errorMsg={errorMsg}
+          initialAppUrl={initialAppUrl}
+        />
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       className="max-w-6xl mx-auto"
     >
+      {/* Mode toggle */}
+      <div className="flex justify-center mb-4">
+        <div className="flex rounded-lg border border-border/50 bg-background/50 p-0.5 gap-0.5">
+          <button
+            onClick={() => setInputMode("ai")}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-medium bg-primary text-primary-foreground shadow-sm transition-colors"
+          >
+            <Play className="h-3 w-3" /> AI Generation
+          </button>
+          <button
+            onClick={() => setInputMode("upload")}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+          >
+            <Upload className="h-3 w-3" /> Upload Spec File
+          </button>
+        </div>
+      </div>
+
       <Card className="rounded-2xl border-border/50 shadow-sm">
         <CardHeader className="pb-0">
           <div className="flex items-start gap-3">
@@ -1188,6 +1436,8 @@ function ReadyPhase({
   onSave,
   isExecuting,
   errorMsg,
+  specTargetUrl,
+  onSpecTargetUrlChange,
 }: {
   analysis: NonNullable<ReturnType<typeof useLiveTesting>["analysis"]>;
   editedTests: PlaywrightTestCase[] | null;
@@ -1196,8 +1446,11 @@ function ReadyPhase({
   onSave: (id: string, updates: Partial<PlaywrightTestCase>) => Promise<void>;
   isExecuting: boolean;
   errorMsg: string | null;
+  specTargetUrl?: string | null;
+  onSpecTargetUrlChange?: (url: string) => void;
 }) {
   const tests = editedTests ?? analysis.tests;
+  const isSpecUpload = analysis.analysis_id.startsWith("spec-");
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -1222,7 +1475,8 @@ function ReadyPhase({
         </div>
       </div>
 
-      {/* Two column: pages + flows */}
+      {/* Two column: pages + flows — only shown for full AI analysis */}
+      {analysis.pages.length > 0 && analysis.user_flows.length > 0 && !analysis.analysis_id.startsWith("spec-") && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Pages */}
         <Card className="border-border/50">
@@ -1285,12 +1539,13 @@ function ReadyPhase({
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Generated test suite — editable */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Generated Test Suite ({tests.length})
+            {analysis.analysis_id.startsWith("spec-") ? "Imported Test Suite" : "Generated Test Suite"} ({tests.length})
           </h2>
           <span className="text-[11px] text-muted-foreground flex items-center gap-1">
             <Pencil className="h-3 w-3" /> Click the pencil icon to edit any test
@@ -1328,9 +1583,26 @@ function ReadyPhase({
         </div>
       )}
 
+      {/* Target URL field for spec uploads */}
+      {isSpecUpload && (
+        <div className="rounded-xl border border-border/50 bg-card/40 p-4 space-y-2">
+          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <Globe className="h-3.5 w-3.5" /> Target App URL
+          </label>
+          <Input
+            placeholder="https://your-app.vercel.app"
+            value={specTargetUrl ?? ""}
+            onChange={(e) => onSpecTargetUrlChange?.(e.target.value)}
+            disabled={isExecuting}
+            className="h-9"
+          />
+          <p className="text-[11px] text-muted-foreground">The app must be running and accessible from this server.</p>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex gap-3">
-        <Button className="flex-1" size="lg" onClick={onExecute} disabled={isExecuting}>
+        <Button className="flex-1" size="lg" onClick={onExecute} disabled={isExecuting || (isSpecUpload && !specTargetUrl?.trim().startsWith("http"))}>
           {isExecuting ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1345,7 +1617,7 @@ function ReadyPhase({
         </Button>
         <Button variant="outline" onClick={onReset} disabled={isExecuting}>
           <RotateCcw className="h-4 w-4 mr-2" />
-          New Repo
+          {isSpecUpload ? "Upload New File" : "New Repo"}
         </Button>
       </div>
     </motion.div>
@@ -1782,11 +2054,39 @@ function RunHistoryPanel() {
   );
 }
 
+// ── sessionStorage prefill (from ViewEntryTree "Run Test Cases" wizard) ────────
+
+interface LtrPrefill {
+  appUrl?: string;
+  githubUrl?: string;
+}
+
+function readAndClearPrefill(): LtrPrefill | null {
+  try {
+    const raw = sessionStorage.getItem("ltr_prefill");
+    if (!raw) return null;
+    sessionStorage.removeItem("ltr_prefill");
+    return JSON.parse(raw) as LtrPrefill;
+  } catch {
+    return null;
+  }
+}
+
 export default function LiveTestRunner({
   onRunComplete,
+  initialGithubUrl,
+  initialAppUrl,
 }: {
   onRunComplete?: (summary: { passed: number; failed: number; total: number; pass_rate: number }) => void;
+  initialGithubUrl?: string;
+  initialAppUrl?: string;
 } = {}) {
+  // Read sessionStorage prefill once on mount (from ViewEntryTree wizard)
+  const prefill = useMemo(() => readAndClearPrefill(), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const effectiveGithubUrl = initialGithubUrl ?? prefill?.githubUrl;
+  const effectiveAppUrl = initialAppUrl ?? prefill?.appUrl;
+
   const {
     phase,
     jobData,
@@ -1797,9 +2097,13 @@ export default function LiveTestRunner({
     errorMsg,
     handleAnalyze,
     handleExecute,
+    handleUploadSpec,
     reset,
+    specTargetUrl,
+    setSpecTargetUrl,
     isStarting,
     isExecuting,
+    isParsingSpec,
   } = useLiveTesting();
 
   // Fire onRunComplete once when run transitions to done
@@ -1823,8 +2127,12 @@ export default function LiveTestRunner({
           <InputPhase
             key="input"
             onAnalyze={(g, t, e, p, prefs, numTests, mode, sha, msg) => handleAnalyze(g, t, e, p, prefs, numTests, mode, sha, msg)}
+            onUploadSpec={(file, targetUrl, email, password) => handleUploadSpec(file, targetUrl, email, password)}
             isAnalyzing={isStarting}
+            isParsing={isParsingSpec}
             errorMsg={errorMsg}
+            initialGithubUrl={effectiveGithubUrl}
+            initialAppUrl={effectiveAppUrl}
           />
         )}
 
@@ -1842,6 +2150,8 @@ export default function LiveTestRunner({
             onSave={saveTest}
             isExecuting={isExecuting}
             errorMsg={errorMsg}
+            specTargetUrl={specTargetUrl}
+            onSpecTargetUrlChange={setSpecTargetUrl}
           />
         )}
 

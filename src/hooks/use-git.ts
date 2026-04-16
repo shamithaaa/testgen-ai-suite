@@ -34,6 +34,7 @@ export function useCommitAndPush() {
       qc.invalidateQueries({ queryKey: ["workspace-tree", payload.workspace_id] });
       qc.invalidateQueries({ queryKey: ["git-status", payload.workspace_id] });
       qc.invalidateQueries({ queryKey: ["git-log", payload.workspace_id] });
+      qc.invalidateQueries({ queryKey: ["commit-impact-tree", payload.workspace_id] });
     },
   });
 }
