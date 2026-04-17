@@ -25,6 +25,7 @@ import NotFound from "./pages/NotFound";
 import DashboardLayout from "@/components/DashboardLayout";
 import UserProfile from "./pages/UserProfile";
 import Deployments from "./pages/Deployments.tsx";
+import ApiCosts from "./pages/ApiCosts";
 
 function App() {
   return (
@@ -57,6 +58,8 @@ function App() {
           <Route path="/prd" element={<PRDGenerator />} />
           {/* New user profile route */}
           <Route path="/profile" element={<UserProfile />} />
+          {/* Hidden admin route — not in sidebar */}
+          <Route path="/cost-tracker" element={<ApiCosts />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

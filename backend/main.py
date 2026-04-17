@@ -12,7 +12,7 @@ from app.routes import (
     github, jira, ci_intelligence, defect_prediction, release_gate,
     monitoring, incidents, sprint,
     workspace, copilot, git_ops, coverage, test_gen,
-    pipeline, impact, commit, deployments, prd,
+    pipeline, impact, commit, deployments, prd, cost_logs,
 )
 
 
@@ -77,6 +77,9 @@ app.include_router(impact.router, prefix=API_PREFIX)
 
 # PRD Generator
 app.include_router(prd.router, prefix=API_PREFIX)
+
+# API Cost Logs (hidden admin route)
+app.include_router(cost_logs.router, prefix=API_PREFIX)
 
 
 @app.get("/", tags=["Health"])

@@ -3,10 +3,12 @@ Azure OpenAI client wrapper.
 All prompts live here so every other service just calls helpers.
 """
 import asyncio
+import inspect
 import json
 import re
 import time
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from openai import AzureOpenAI, RateLimitError, APIStatusError
@@ -20,6 +22,30 @@ _client = AzureOpenAI(
 )
 _DEPLOYMENT = settings.AZURE_OPENAI_DEPLOYMENT
 
+# GPT-5 pricing (USD per token)
+_COST_INPUT_PER_TOKEN = 2.50 / 1_000_000   # $2.50 per 1M input tokens
+_COST_OUTPUT_PER_TOKEN = 10.00 / 1_000_000  # $10.00 per 1M output tokens
+
+_TASK_LABELS: dict[str, str] = {
+    "generate_test_cases": "Generate Test Cases",
+    "generate_requirement_based_data": "Generate Test Data (Requirement)",
+    "generate_column_based_data": "Generate Test Data (Columns)",
+    "analyze_codebase": "Analyze Codebase",
+    "generate_playwright_tests": "Generate Playwright Tests",
+    "analyze_commit_and_generate_tests": "Analyze Commit & Generate Tests",
+    "prioritize_tests": "Prioritize Tests",
+    "review_pull_request": "Review Pull Request",
+    "explain_ci_failure": "Explain CI Failure",
+    "generate_defect_risk_narrative": "Generate Defect Risk Narrative",
+    "analyze_release_readiness": "Analyze Release Readiness",
+    "investigate_incident": "Investigate Incident",
+    "generate_sprint_summary": "Generate Sprint Summary",
+    "generate_acceptance_criteria": "Generate Acceptance Criteria",
+    "generate_predictive_alert": "Generate Predictive Alert",
+    "generate_playwright_tests_from_source": "Generate Playwright Tests (Source)",
+    "call_ai": "AI Copilot / Workspace",
+}
+
 # --- rate-limit handling ---------------------------------------------------
 
 class AIQuotaError(Exception):
@@ -30,8 +56,8 @@ def _is_quota_error(exc: Exception) -> bool:
     return isinstance(exc, RateLimitError) or "429" in str(exc) or "quota" in str(exc).lower()
 
 
-def _call_openai_sync(prompt: str, json_mode: bool = True) -> str:
-    """Synchronous Azure OpenAI chat completion with up to 3 retries on 429."""
+def _call_openai_sync(prompt: str, json_mode: bool = True) -> tuple[str, int, int]:
+    """Synchronous Azure OpenAI chat completion. Returns (content, prompt_tokens, completion_tokens)."""
     delays = [5, 15, 30]
     kwargs: dict = {
         "model": _DEPLOYMENT,
@@ -42,7 +68,11 @@ def _call_openai_sync(prompt: str, json_mode: bool = True) -> str:
     for attempt, delay in enumerate(delays, 1):
         try:
             response = _client.chat.completions.create(**kwargs)
-            return response.choices[0].message.content or ""
+            content = response.choices[0].message.content or ""
+            usage = response.usage
+            prompt_tokens = usage.prompt_tokens if usage else 0
+            completion_tokens = usage.completion_tokens if usage else 0
+            return content, prompt_tokens, completion_tokens
         except Exception as exc:
             if _is_quota_error(exc):
                 if attempt < len(delays):
@@ -56,15 +86,45 @@ def _call_openai_sync(prompt: str, json_mode: bool = True) -> str:
             raise  # non-429 errors bubble up immediately
 
 
-async def _call_openai(prompt: str, json_mode: bool = True) -> str:
+async def _log_cost(task_name: str, prompt_tokens: int, completion_tokens: int) -> None:
+    """Persist a cost record to MongoDB. Never raises — cost logging must not break AI calls."""
+    try:
+        input_cost = round(prompt_tokens * _COST_INPUT_PER_TOKEN, 6)
+        output_cost = round(completion_tokens * _COST_OUTPUT_PER_TOKEN, 6)
+        total_cost = round(input_cost + output_cost, 6)
+        from app.database import get_db
+        db = get_db()
+        await db["api_cost_logs"].insert_one({
+            "task_name": task_name,
+            "model": _DEPLOYMENT,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+            "input_cost_usd": input_cost,
+            "output_cost_usd": output_cost,
+            "total_cost_usd": total_cost,
+            "created_at": datetime.now(timezone.utc),
+        })
+    except Exception:
+        pass  # Never break the main AI call due to cost logging failure
+
+
+async def _call_openai(prompt: str, json_mode: bool = True, task_name: str | None = None) -> str:
     """Async wrapper — runs the sync call in a thread so the event loop isn't blocked."""
-    return await asyncio.to_thread(_call_openai_sync, prompt, json_mode)
+    if task_name is None:
+        frame = inspect.currentframe()
+        caller = frame.f_back.f_code.co_name if (frame and frame.f_back) else "unknown"
+        task_name = _TASK_LABELS.get(caller, caller.replace("_", " ").title())
+
+    content, prompt_tokens, completion_tokens = await asyncio.to_thread(_call_openai_sync, prompt, json_mode)
+    asyncio.create_task(_log_cost(task_name, prompt_tokens, completion_tokens))
+    return content
 
 
 # Public alias used by impact_service and other services that prefer a shorter name
-async def call_ai(prompt: str, max_tokens: int = 2000) -> str:
+async def call_ai(prompt: str, max_tokens: int = 2000, task_name: str | None = None) -> str:
     """Public async helper: sends a prompt and returns the raw text response."""
-    return await _call_openai(prompt, json_mode=False)
+    return await _call_openai(prompt, json_mode=False, task_name=task_name or _TASK_LABELS["call_ai"])
 
 # --------------------------------------------------------------------------
 
