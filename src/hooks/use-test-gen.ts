@@ -15,7 +15,7 @@ export function useGenerateTests() {
 
 export function useRunTests() {
   return useMutation({
-    mutationFn: (payload: RunTestsRequest) => api.runTests(payload),
+    mutationFn: (payload: RunTestsRequest) => api.runGeneratedTests(payload),
   });
 }
 

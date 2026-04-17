@@ -15,6 +15,7 @@ import {
   Network,
   BookOpen,
   Rocket,
+  ClipboardList,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -38,6 +39,7 @@ const sdlcTools = [
   { title: "Code Reviewer", url: "/code-review", icon: GitPullRequest, hint: "AI inline PR review" },
   { title: "Code Impact", url: "/code-impact", icon: Network, hint: "Root→Leaf dependency graph + test gen" },
   { title: "Deployments", url: "/deployments", icon: Rocket, hint: "Trigger + track Vercel deployments" },
+  { title: "PRD Generator", url: "/prd", icon: ClipboardList, hint: "AI-generated Product Requirements Doc" },
   { title: "Doc-Driven Tests", url: "/doc-tests", icon: BookOpen, hint: "Upload docs → extract scenarios → run tests" },
   { title: "Live Test Runner", url: "/live-testing", icon: Clapperboard, hint: "Repository → AI → Browser execution" },
   { title: "Defect Prediction", url: "/defect-prediction", icon: Bug, hint: "File risk scoring from git history" },

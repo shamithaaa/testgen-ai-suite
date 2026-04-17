@@ -20,6 +20,7 @@ import Workspace from "./pages/Workspace";
 import SDLCPipeline from "./pages/SDLCPipeline";
 import CodeImpact from "./pages/CodeImpact";
 import DocTests from "./pages/DocTests";
+import PRDGenerator from "./pages/PRDGenerator";
 import NotFound from "./pages/NotFound";
 import DashboardLayout from "@/components/DashboardLayout";
 import UserProfile from "./pages/UserProfile";
@@ -53,6 +54,7 @@ function App() {
           {/* Code Impact + Test Intelligence (Plan.md Flow 1 & 2) */}
           <Route path="/code-impact" element={<CodeImpact />} />
           <Route path="/doc-tests" element={<DocTests />} />
+          <Route path="/prd" element={<PRDGenerator />} />
           {/* New user profile route */}
           <Route path="/profile" element={<UserProfile />} />
         </Route>

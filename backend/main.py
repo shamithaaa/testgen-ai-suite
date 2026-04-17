@@ -12,7 +12,7 @@ from app.routes import (
     github, jira, ci_intelligence, defect_prediction, release_gate,
     monitoring, incidents, sprint,
     workspace, copilot, git_ops, coverage, test_gen,
-    pipeline, impact, commit, deployments,
+    pipeline, impact, commit, deployments, prd,
 )
 
 
@@ -74,6 +74,9 @@ app.include_router(deployments.router, prefix=API_PREFIX)
 
 # Code Impact + Test Intelligence routes (Flow 1 & 2)
 app.include_router(impact.router, prefix=API_PREFIX)
+
+# PRD Generator
+app.include_router(prd.router, prefix=API_PREFIX)
 
 
 @app.get("/", tags=["Health"])

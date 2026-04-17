@@ -663,6 +663,24 @@ export interface PlaywrightExportRequest {
   target_url?: string;
 }
 
+export interface ChainAnalyzeRequest {
+  workspace_id: string;
+  chain: string[];
+  changed_files: string[];
+}
+
+export interface FileChainAnalysis {
+  file_path: string;
+  summary: string;
+  changes_description: string;
+  suggested_count: number;
+  reason: string;
+}
+
+export interface ChainAnalyzeResponse {
+  analyses: FileChainAnalysis[];
+}
+
 export interface PlaywrightExportResponse {
   file_path: string;
   content: string;
@@ -1037,12 +1055,15 @@ export const api = {
   generateTests: (payload: TestGenerateRequest) =>
     apiClient.post<TestGenerateResult>("/tests/generate", payload).then((r) => r.data),
 
-  runTests: (payload: RunTestsRequest) =>
+  runGeneratedTests: (payload: RunTestsRequest) =>
     apiClient.post<TestRunResult>("/tests/run", payload).then((r) => r.data),
 
   // Playwright Test Generation from Workspace Source
   generatePlaywrightTests: (payload: PlaywrightGenerateRequest) =>
     apiClient.post<PlaywrightGenerateResponse>("/tests/generate-playwright", payload).then((r) => r.data),
+
+  analyzeChain: (payload: ChainAnalyzeRequest) =>
+    apiClient.post<ChainAnalyzeResponse>("/tests/analyze-chain", payload).then((r) => r.data),
 
   exportPlaywrightTests: (payload: PlaywrightExportRequest) =>
     apiClient.post<PlaywrightExportResponse>("/tests/export-playwright", payload).then((r) => r.data),
@@ -1273,4 +1294,50 @@ export const impactApi = {
 export interface WorkspaceGraphResponse {
   nodes: GraphNode[];
   edges: GraphEdge[];
+}
+
+// ─── PRD Generator Types ──────────────────────────────────────────────────────
+
+export interface PRDUseCase {
+  title: string;
+  actor: string;
+  description: string;
+  steps: string[];
+}
+
+export interface PRDUserStory {
+  as_a: string;
+  i_want: string;
+  so_that: string;
+  acceptance_criteria: string[];
+}
+
+export interface PRDSection {
+  executive_summary: string;
+  problem_statement: string;
+  goals: string[];
+  target_users: string[];
+  use_cases: PRDUseCase[];
+  user_stories: PRDUserStory[];
+  functional_requirements: string[];
+  non_functional_requirements: string[];
+  out_of_scope: string[];
+  success_metrics: string[];
+}
+
+export interface PRDGenerateRequest {
+  product_name: string;
+  description: string;
+  target_audience: string;
+  tech_stack?: string;
+  core_features: string[];
+  additional_context?: string;
+}
+
+export interface PRDGenerateResponse {
+  id: string;
+  product_name: string;
+  markdown: string;
+  sections: PRDSection;
+  created_at: string;
 }
