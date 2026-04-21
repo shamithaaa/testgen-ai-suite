@@ -686,7 +686,25 @@ Focus on: SQL injection, XSS, null dereferences, missing error handling, hardcod
 N+1 queries, missing input validation, unhandled promises, race conditions.
 Return JSON only."""
     raw = await _call_openai(prompt)
-    return json.loads(_clean_json(raw))
+    data = json.loads(_clean_json(raw))
+    # Normalise: AI sometimes returns summary as a nested object — flatten it
+    summary_field = data.get("summary", "")
+    if isinstance(summary_field, dict):
+        parts = []
+        if summary_field.get("what_changed"):
+            parts.append(summary_field["what_changed"])
+        if summary_field.get("overall_risk"):
+            parts.append(f"Risk: {summary_field['overall_risk']}")
+        if summary_field.get("test_coverage_estimate"):
+            parts.append(summary_field["test_coverage_estimate"])
+        data["summary"] = " | ".join(parts) if parts else str(summary_field)
+        # Promote recommendation out of summary if missing at top level
+        if not data.get("recommendation") and summary_field.get("review_recommendation"):
+            data["recommendation"] = summary_field["review_recommendation"]
+    # Normalise positive_observations → positives
+    if "positive_observations" in data and "positives" not in data:
+        data["positives"] = data.pop("positive_observations")
+    return data
 
 
 async def explain_ci_failure(step: str, error_message: str, stack_trace: str, repo_language: str) -> dict[str, Any]:

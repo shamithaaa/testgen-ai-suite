@@ -11,7 +11,7 @@ interface CostLog {
   total_tokens: number;
   input_cost_usd: number;
   output_cost_usd: number;
-  total_cost_usd: number;
+  total_cost_usd: number; 
   created_at: string;
 }
 

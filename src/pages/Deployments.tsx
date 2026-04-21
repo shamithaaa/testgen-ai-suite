@@ -240,8 +240,14 @@ export default function Deployments() {
   }, [status]);
 
   const canDeploy = !!repoValidated && !!branch.trim() && (!deployByCommit || !!selectedCommit.trim());
-  const deploymentPublicUrl = status?.url ? `https://${status.url}` : "";
-  const primaryDomain = status?.domains?.[0] || deploymentPublicUrl.replace(/^https:\/\//, "");
+  // Safely normalize – status.url might already contain the scheme or be a bare host
+  const rawUrl = status?.url || "";
+  const deploymentPublicUrl = rawUrl
+    ? rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
+      ? rawUrl
+      : `https://${rawUrl}`
+    : "";
+  const primaryDomain = status?.domains?.[0] || (deploymentPublicUrl ? normalizeHost(deploymentPublicUrl) : "");
   const previewCandidates = buildPreviewCandidates({
     primaryDomain,
     deploymentPublicUrl,
@@ -586,7 +592,19 @@ export default function Deployments() {
 
             <div className="rounded-md border border-border/50 bg-muted/10 p-3 space-y-1 text-xs">
               <p className="text-foreground/70 flex items-center gap-1"><Globe className="h-3.5 w-3.5" /> Domain</p>
-              <p className="font-medium text-foreground break-all">{primaryDomain || "-"}</p>
+              {previewUrl ? (
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-primary break-all hover:underline inline-flex items-center gap-1"
+                >
+                  {primaryDomain || previewUrl}
+                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                </a>
+              ) : (
+                <p className="font-medium text-foreground break-all">{primaryDomain || "-"}</p>
+              )}
               <p className="text-foreground/75">Source branch: {status?.sourceBranch || branch || "-"}</p>
               <p className="text-foreground/75">Commit: {(status?.sourceCommitSha || selectedCommit || "").slice(0, 10) || "-"}</p>
               {status?.sourceCommitMessage && <p className="text-foreground/70 truncate" title={status.sourceCommitMessage}>{status.sourceCommitMessage}</p>}

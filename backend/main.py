@@ -14,6 +14,7 @@ from app.routes import (
     workspace, copilot, git_ops, coverage, test_gen,
     pipeline, impact, commit, deployments, prd, cost_logs,
 )
+from app.routes import ai_ide
 
 
 @asynccontextmanager
@@ -80,6 +81,9 @@ app.include_router(prd.router, prefix=API_PREFIX)
 
 # API Cost Logs (hidden admin route)
 app.include_router(cost_logs.router, prefix=API_PREFIX)
+
+# AI IDE — streaming code generation workspace
+app.include_router(ai_ide.router, prefix=API_PREFIX)
 
 
 @app.get("/", tags=["Health"])

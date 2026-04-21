@@ -58,8 +58,13 @@ function CommitCard({
 
   const review = reviewMutation.data?.review as PipelineReview | undefined;
 
-  const recKey = review?.recommendation ?? "COMMENT";
-  const recCfg = RECOMMENDATION_CONFIG[recKey] ?? RECOMMENDATION_CONFIG["COMMENT"];
+  const rawSummary = review?.summary;
+  // AI sometimes returns summary as an object {overall_risk, what_changed, ...}
+  const summaryObj = rawSummary && typeof rawSummary === "object" ? rawSummary as Record<string, string> : null;
+  const summaryText = summaryObj ? summaryObj.what_changed ?? JSON.stringify(rawSummary) : (typeof rawSummary === "string" ? rawSummary : "");
+  // recommendation can be top-level OR inside summary object
+  const recKey = (review?.recommendation ?? summaryObj?.review_recommendation ?? "COMMENT") as string;
+  const recCfg = RECOMMENDATION_CONFIG[recKey.toUpperCase()] ?? RECOMMENDATION_CONFIG["COMMENT"];
 
   return (
     <div className="floating-card p-4">
@@ -114,7 +119,21 @@ function CommitCard({
             <div className="mt-4 pt-4 border-t border-border/50 space-y-4">
               {/* Summary */}
               <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
-                <p className="text-sm font-medium mb-1">{review.summary}</p>
+                {summaryObj ? (
+                  <div className="space-y-1.5">
+                    {summaryObj.overall_risk && (
+                      <p className="text-xs"><span className="font-medium text-muted-foreground">Risk:</span> <span className="capitalize">{summaryObj.overall_risk}</span></p>
+                    )}
+                    {summaryObj.what_changed && (
+                      <p className="text-sm font-medium">{summaryObj.what_changed}</p>
+                    )}
+                    {summaryObj.test_coverage_estimate && (
+                      <p className="text-xs text-muted-foreground">{summaryObj.test_coverage_estimate}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm font-medium mb-1">{summaryText}</p>
+                )}
                 <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2 flex-wrap">
                   {review.coverage_estimate != null && (
                     <span>Coverage: ~{review.coverage_estimate}%</span>
@@ -183,14 +202,14 @@ function CommitCard({
               )}
 
               {/* Positive observations */}
-              {review.positives?.length > 0 && (
+              {((review.positives ?? (review as any).positive_observations) as string[] | undefined)?.length > 0 && (
                 <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/20">
                   <div className="flex items-center gap-2 mb-2">
                     <CheckCircle className="h-4 w-4 text-green-400" />
                     <span className="text-xs font-medium text-green-400">Positive Observations</span>
                   </div>
                   <ul className="space-y-1">
-                    {review.positives.map((o, i) => (
+                    {((review.positives ?? (review as any).positive_observations) as string[]).map((o, i) => (
                       <li key={i} className="text-xs text-muted-foreground">• {o}</li>
                     ))}
                   </ul>

@@ -741,7 +741,7 @@ export function ViewEntryTree({ refreshNonce = 0 }: { refreshNonce?: number } = 
               View Entry
             </p>
             <p className="text-[10px] text-muted-foreground/60">
-              Root = changed file, tree = dependency flow
+              ,  
             </p>
           </div>
           <div className="flex items-center gap-1">
