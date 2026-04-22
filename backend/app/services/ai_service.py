@@ -642,15 +642,410 @@ Base priority on: failure frequency, severity, recent failures, and potential im
 
 
 async def review_pull_request(pr_title: str, pr_body: str, files: list[dict]) -> dict[str, Any]:
-    """
-    AI code review for a GitHub pull request.
-    Returns structured findings and a PR summary.
-    """
-    diff_text = "\n\n".join(
-        f"=== {f['filename']} (+{f['additions']} -{f['deletions']}) ===\n{f.get('patch', '')[:3000]}"
-        for f in files[:15]
+  """AI code review for a GitHub pull request with safe v2->legacy fallback."""
+  if not settings.PR_REVIEW_V2_ENABLED:
+    return await _review_pull_request_legacy(pr_title, pr_body, files)
+  try:
+    return await _review_pull_request_v2(pr_title, pr_body, files)
+  except Exception:
+    return await _review_pull_request_legacy(pr_title, pr_body, files)
+
+
+_OSS_SUMMARIZE_FILE_DIFF_PROMPT = """## GitHub PR Title
+
+`$title`
+
+## Description
+
+```
+$description
+```
+
+## Diff
+
+```diff
+$file_diff
+```
+
+## Instructions
+
+I would like you to succinctly summarize the diff within 100 words.
+If applicable, your summary should include a note about alterations
+to the signatures of exported functions, global data structures and
+variables, and any changes that might affect the external interface or
+behavior of the code.
+"""
+
+_OSS_TRIAGE_FILE_DIFF_PROMPT = """Below the summary, I would also like you to triage the diff as `NEEDS_REVIEW` or
+`APPROVED` based on the following criteria:
+
+- If the diff involves any modifications to the logic or functionality, even if they
+  seem minor, triage it as `NEEDS_REVIEW`. This includes changes to control structures,
+  function calls, or variable assignments that might impact the behavior of the code.
+- If the diff only contains very minor changes that don't affect the code logic, such as
+  fixing typos, formatting, or renaming variables for clarity, triage it as `APPROVED`.
+
+Please evaluate the diff thoroughly and take into account factors such as the number of
+lines changed, the potential impact on the overall system, and the likelihood of
+introducing new bugs or security vulnerabilities.
+When in doubt, always err on the side of caution and triage the diff as `NEEDS_REVIEW`.
+
+You must strictly follow the format below for triaging the diff:
+[TRIAGE]: <NEEDS_REVIEW or APPROVED>
+
+Important:
+- In your summary do not mention that the file needs a through review or caution about
+  potential issues.
+- Do not provide any reasoning why you triaged the diff as `NEEDS_REVIEW` or `APPROVED`.
+- Do not mention that these changes affect the logic or functionality of the code in
+  the summary. You must only use the triage status format above to indicate that.
+"""
+
+_OSS_REVIEW_FILE_DIFF_PROMPT = """## GitHub PR Title
+
+`$title`
+
+## Description
+
+```
+$description
+```
+
+## Summary of changes
+
+```
+$short_summary
+```
+
+## IMPORTANT Instructions
+
+Input: New hunks annotated with line numbers and old hunks (replaced code). Hunks represent incomplete code fragments.
+Additional Context: PR title, description, summaries and comment chains.
+Task: Review new hunks for substantive issues using provided context and respond with comments if necessary.
+Output: Review comments in markdown with exact line number ranges in new hunks. Start and end line numbers must be within the same hunk. For single-line comments, start=end line number. Must use example response format below.
+Use fenced code blocks using the relevant language identifier where applicable.
+Don't annotate code snippets with line numbers. Format and indent code correctly.
+Do not use `suggestion` code blocks.
+For fixes, use `diff` code blocks, marking changes with `+` or `-`. The line number range for comments with fix snippets must exactly match the range to replace in the new hunk.
+
+- Do NOT provide general feedback, summaries, explanations of changes, or praises
+  for making good additions.
+- Focus solely on offering specific, objective insights based on the
+  given context and refrain from making broad comments about potential impacts on
+  the system or question intentions behind the changes.
+
+If there are no issues found on a line range, you MUST respond with the
+text `LGTM!` for that line range in the review section.
+
+## Changes made to `$filename` for your review
+
+$patches
+"""
+
+
+def _render_oss_prompt(template: str, values: dict[str, str]) -> str:
+  rendered = template
+  for key, value in values.items():
+    rendered = rendered.replace(f"${key}", value)
+  return rendered
+
+
+def _parse_patch_line_bounds(patch: str) -> tuple[int, int]:
+  pattern = re.compile(r"^@@\s+-\d+(?:,\d+)?\s+\+(\d+)(?:,(\d+))?\s+@@", re.MULTILINE)
+  bounds: list[tuple[int, int]] = []
+  for match in pattern.finditer(patch):
+    start = int(match.group(1))
+    length = int(match.group(2) or "1")
+    end = start + max(length - 1, 0)
+    bounds.append((start, end))
+  if not bounds:
+    return (1, 1)
+  return min(x[0] for x in bounds), max(x[1] for x in bounds)
+
+
+def _extract_hunks(patch: str, max_hunks: int) -> list[dict[str, Any]]:
+  pattern = re.compile(
+    r"^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@",
+    re.MULTILINE,
+  )
+  hunks: list[dict[str, Any]] = []
+  matches = list(pattern.finditer(patch))
+  for idx, match in enumerate(matches):
+    start_ix = match.start()
+    end_ix = matches[idx + 1].start() if idx + 1 < len(matches) else len(patch)
+    new_start = int(match.group(3))
+    new_len = int(match.group(4) or "1")
+    new_end = new_start + max(new_len - 1, 0)
+    hunks.append(
+      {
+        "start_line": new_start,
+        "end_line": new_end,
+        "text": patch[start_ix:end_ix].strip(),
+      }
     )
-    prompt = f"""You are a senior software engineer performing a thorough code review.
+    if len(hunks) >= max_hunks:
+      break
+  return hunks
+
+
+def _normalize_recommendation(value: str | None) -> str:
+  normalized = (value or "").strip().upper()
+  allowed = {"APPROVE", "REQUEST_CHANGES", "NEEDS_DISCUSSION", "CONDITIONAL"}
+  if normalized in allowed:
+    return normalized
+  if normalized in {"COMMENT", "COMMENTS"}:
+    return "CONDITIONAL"
+  return "CONDITIONAL"
+
+
+def _normalize_severity(value: str | None) -> str:
+  normalized = (value or "").strip().lower()
+  if normalized in {"critical", "high", "medium", "low"}:
+    return normalized
+  return "low"
+
+
+def _normalize_category(value: str | None) -> str:
+  normalized = (value or "").strip().lower()
+  allowed = {
+    "security",
+    "bug",
+    "performance",
+    "style",
+    "test-coverage",
+    "maintainability",
+  }
+  return normalized if normalized in allowed else "maintainability"
+
+
+def _normalize_findings(file_name: str, patch: str, findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+  min_line, max_line = _parse_patch_line_bounds(patch)
+  normalized: list[dict[str, Any]] = []
+  for raw in findings:
+    message_text = str(raw.get("message") or "").strip()
+    if message_text.lower() in {"lgtm", "lgtm!", "looks good", "looks good to me", "no changes needed."}:
+      continue
+
+    start_line = raw.get("start_line") or raw.get("line") or min_line
+    end_line = raw.get("end_line") or start_line
+    try:
+      start_line = int(start_line)
+    except (TypeError, ValueError):
+      start_line = min_line
+    try:
+      end_line = int(end_line)
+    except (TypeError, ValueError):
+      end_line = start_line
+
+    start_line = max(min_line, min(start_line, max_line))
+    end_line = max(start_line, min(end_line, max_line))
+
+    normalized.append(
+      {
+        "file": file_name,
+        "line": start_line,
+        "start_line": start_line,
+        "end_line": end_line,
+        "severity": _normalize_severity(raw.get("severity")),
+        "category": _normalize_category(raw.get("category")),
+        "message": message_text or "Potential issue identified.",
+        "suggestion": str(raw.get("suggestion") or "Review this block and add safeguards."),
+      }
+    )
+  return normalized
+
+
+async def _review_pull_request_v2(pr_title: str, pr_body: str, files: list[dict]) -> dict[str, Any]:
+  files_limit = max(1, settings.PR_REVIEW_MAX_FILES)
+  patch_limit = max(500, settings.PR_REVIEW_MAX_PATCH_CHARS)
+  hunks_limit = max(1, settings.PR_REVIEW_MAX_HUNKS_PER_FILE)
+
+  selected_files: list[dict[str, Any]] = []
+  skipped_files = 0
+  for file_obj in files[:files_limit]:
+    patch = str(file_obj.get("patch") or "")
+    if not patch.strip():
+      skipped_files += 1
+      continue
+    selected_files.append(
+      {
+        "filename": str(file_obj.get("filename") or "unknown"),
+        "additions": int(file_obj.get("additions") or 0),
+        "deletions": int(file_obj.get("deletions") or 0),
+        "patch": patch[:patch_limit],
+      }
+    )
+
+  if not selected_files:
+    return {
+      "summary": {
+        "overall_risk": "low",
+        "what_changed": "No textual diff hunks were available for review.",
+        "test_coverage_estimate": "Not enough code changes to evaluate.",
+        "review_recommendation": "CONDITIONAL",
+      },
+      "findings": [],
+      "security_flags": [],
+      "positive_observations": [],
+      "positives": [],
+      "recommendation": "CONDITIONAL",
+      "meta": {
+        "files_reviewed": 0,
+        "files_skipped": skipped_files,
+        "engine_version": "v2",
+      },
+    }
+
+  file_summaries: list[dict[str, str]] = []
+  review_targets: list[dict[str, Any]] = []
+  aggregated_security_flags: list[str] = []
+  aggregated_positives: list[str] = []
+  all_findings: list[dict[str, Any]] = []
+
+  for file_obj in selected_files:
+    summary_prompt = _render_oss_prompt(
+      _OSS_SUMMARIZE_FILE_DIFF_PROMPT + "\n\n" + _OSS_TRIAGE_FILE_DIFF_PROMPT,
+      {
+        "title": pr_title,
+        "description": pr_body[:1200] or "no description provided",
+        "file_diff": file_obj["patch"],
+      },
+    ) + """
+
+Return ONLY valid JSON:
+{
+  "summary": "Max 100 words",
+  "triage": "NEEDS_REVIEW|APPROVED"
+}
+"""
+    summary_raw = await _call_openai(summary_prompt, json_mode=True, task_name="Review Pull Request")
+    summary_data = json.loads(_clean_json(summary_raw))
+    triage = str(summary_data.get("triage") or "NEEDS_REVIEW").strip().upper()
+    if triage not in {"NEEDS_REVIEW", "APPROVED"}:
+      triage = "NEEDS_REVIEW"
+    summary_text = str(summary_data.get("summary") or "Diff summarized.")
+
+    file_summaries.append(
+      {
+        "file": file_obj["filename"],
+        "summary": summary_text,
+        "triage": triage,
+      }
+    )
+
+    if triage == "NEEDS_REVIEW":
+      review_targets.append(file_obj)
+
+  if not review_targets:
+    review_targets = selected_files[: max(1, min(2, len(selected_files)))]
+
+  for file_obj in review_targets:
+    hunks = _extract_hunks(file_obj["patch"], hunks_limit)
+    patches_text = "\n\n".join(
+      [
+        f"---new_hunk---\n```\n{h['text']}\n```\n\n---old_hunk---\n```\nUnavailable from provider patch payload\n```\n\n---end_change_section---"
+        for h in hunks
+      ]
+    )
+    short_summary_text = "\n".join(
+      [f"- {item['file']}: {item['summary']}" for item in file_summaries[:12]]
+    )
+    review_prompt = _render_oss_prompt(
+      _OSS_REVIEW_FILE_DIFF_PROMPT,
+      {
+        "title": pr_title,
+        "description": pr_body[:1200] or "no description provided",
+        "short_summary": short_summary_text or "No summary available.",
+        "filename": file_obj["filename"],
+        "patches": patches_text,
+      },
+    ) + """
+
+Return ONLY valid JSON with exactly this shape:
+{
+  "findings": [
+    {
+      "start_line": 1,
+      "end_line": 1,
+      "severity": "critical|high|medium|low",
+      "category": "security|bug|performance|style|test-coverage|maintainability",
+      "message": "Issue detail",
+      "suggestion": "Concrete fix"
+    }
+  ],
+  "security_flags": ["string"],
+  "positive_observations": ["string"]
+}
+"""
+    review_raw = await _call_openai(review_prompt, json_mode=True, task_name="Review Pull Request")
+    review_data = json.loads(_clean_json(review_raw))
+
+    findings = review_data.get("findings") or []
+    if isinstance(findings, list):
+      all_findings.extend(_normalize_findings(file_obj["filename"], file_obj["patch"], findings))
+
+    security_flags = review_data.get("security_flags") or []
+    positives = review_data.get("positive_observations") or []
+    if isinstance(security_flags, list):
+      aggregated_security_flags.extend([str(x) for x in security_flags if str(x).strip()])
+    if isinstance(positives, list):
+      aggregated_positives.extend([str(x) for x in positives if str(x).strip()])
+
+  final_prompt = f"""You are a release-focused code reviewer.
+
+PR TITLE: {pr_title}
+PR DESCRIPTION: {pr_body[:1200]}
+
+FILE SUMMARIES:
+{json.dumps(file_summaries, indent=2)[:12000]}
+
+FINDINGS:
+{json.dumps(all_findings, indent=2)[:12000]}
+
+Return ONLY valid JSON:
+{{
+  "overall_risk": "low|medium|high|critical",
+  "what_changed": "1-2 sentence summary",
+  "test_coverage_estimate": "Coverage note",
+  "review_recommendation": "APPROVE|REQUEST_CHANGES|NEEDS_DISCUSSION|CONDITIONAL"
+}}
+"""
+  final_raw = await _call_openai(final_prompt, json_mode=True, task_name="Review Pull Request")
+  final_data = json.loads(_clean_json(final_raw))
+
+  recommendation = _normalize_recommendation(str(final_data.get("review_recommendation") or "CONDITIONAL"))
+  unique_security = list(dict.fromkeys(aggregated_security_flags))
+  unique_positives = list(dict.fromkeys(aggregated_positives))
+
+  return {
+    "summary": {
+      "overall_risk": str(final_data.get("overall_risk") or "medium").lower(),
+      "what_changed": str(final_data.get("what_changed") or "Updated files and behavior in this pull request."),
+      "test_coverage_estimate": str(final_data.get("test_coverage_estimate") or "Tests impact requires manual verification."),
+      "review_recommendation": recommendation,
+    },
+    "findings": all_findings,
+    "security_flags": unique_security,
+    "positive_observations": unique_positives,
+    "positives": unique_positives,
+    "recommendation": recommendation,
+    "meta": {
+      "files_reviewed": len(selected_files),
+      "files_skipped": skipped_files,
+      "files_triaged_for_deep_review": len(review_targets),
+      "engine_version": "v2",
+      "file_summaries": file_summaries,
+    },
+  }
+
+
+async def _review_pull_request_legacy(pr_title: str, pr_body: str, files: list[dict]) -> dict[str, Any]:
+  """Legacy single-pass PR review path kept for fallback compatibility."""
+  diff_text = "\n\n".join(
+    f"=== {f['filename']} (+{f['additions']} -{f['deletions']}) ===\n{f.get('patch', '')[:3000]}"
+    for f in files[:15]
+  )
+  prompt = f"""You are a senior software engineer performing a thorough code review.
 
 PR TITLE: {pr_title}
 PR DESCRIPTION: {pr_body[:1000]}
@@ -663,20 +1058,20 @@ Analyse every file in the diff and return structured findings.
 Return ONLY valid JSON (no markdown) with exactly this shape:
 {{
   "summary": {{
-    "overall_risk": "low|medium|high|critical",
-    "what_changed": "1–2 sentence description",
-    "test_coverage_estimate": "string (e.g. 'No tests included', 'Unit tests added for 3 functions')",
-    "review_recommendation": "APPROVE|REQUEST_CHANGES|NEEDS_DISCUSSION"
+  "overall_risk": "low|medium|high|critical",
+  "what_changed": "1–2 sentence description",
+  "test_coverage_estimate": "string (e.g. 'No tests included', 'Unit tests added for 3 functions')",
+  "review_recommendation": "APPROVE|REQUEST_CHANGES|NEEDS_DISCUSSION"
   }},
   "findings": [
-    {{
-      "file": "relative/file/path.ts",
-      "line": 42,
-      "severity": "critical|high|medium|low",
-      "category": "security|bug|performance|style|test-coverage|maintainability",
-      "message": "Clear description of the issue",
-      "suggestion": "Concrete fix or improvement"
-    }}
+  {{
+    "file": "relative/file/path.ts",
+    "line": 42,
+    "severity": "critical|high|medium|low",
+    "category": "security|bug|performance|style|test-coverage|maintainability",
+    "message": "Clear description of the issue",
+    "suggestion": "Concrete fix or improvement"
+  }}
   ],
   "security_flags": ["string"],
   "positive_observations": ["string"]
@@ -685,26 +1080,23 @@ Return ONLY valid JSON (no markdown) with exactly this shape:
 Focus on: SQL injection, XSS, null dereferences, missing error handling, hardcoded secrets,
 N+1 queries, missing input validation, unhandled promises, race conditions.
 Return JSON only."""
-    raw = await _call_openai(prompt)
-    data = json.loads(_clean_json(raw))
-    # Normalise: AI sometimes returns summary as a nested object — flatten it
-    summary_field = data.get("summary", "")
-    if isinstance(summary_field, dict):
-        parts = []
-        if summary_field.get("what_changed"):
-            parts.append(summary_field["what_changed"])
-        if summary_field.get("overall_risk"):
-            parts.append(f"Risk: {summary_field['overall_risk']}")
-        if summary_field.get("test_coverage_estimate"):
-            parts.append(summary_field["test_coverage_estimate"])
-        data["summary"] = " | ".join(parts) if parts else str(summary_field)
-        # Promote recommendation out of summary if missing at top level
-        if not data.get("recommendation") and summary_field.get("review_recommendation"):
-            data["recommendation"] = summary_field["review_recommendation"]
-    # Normalise positive_observations → positives
-    if "positive_observations" in data and "positives" not in data:
-        data["positives"] = data.pop("positive_observations")
-    return data
+  raw = await _call_openai(prompt)
+  data = json.loads(_clean_json(raw))
+  summary_field = data.get("summary", "")
+  if isinstance(summary_field, dict):
+    parts = []
+    if summary_field.get("what_changed"):
+      parts.append(summary_field["what_changed"])
+    if summary_field.get("overall_risk"):
+      parts.append(f"Risk: {summary_field['overall_risk']}")
+    if summary_field.get("test_coverage_estimate"):
+      parts.append(summary_field["test_coverage_estimate"])
+    data["summary"] = " | ".join(parts) if parts else str(summary_field)
+    if not data.get("recommendation") and summary_field.get("review_recommendation"):
+      data["recommendation"] = summary_field["review_recommendation"]
+  if "positive_observations" in data and "positives" not in data:
+    data["positives"] = data.pop("positive_observations")
+  return data
 
 
 async def explain_ci_failure(step: str, error_message: str, stack_trace: str, repo_language: str) -> dict[str, Any]:

@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   GitPullRequest, Search, Shield, AlertTriangle, CheckCircle, XCircle,
-  ChevronDown, ChevronRight, Code2, ExternalLink, Loader2, Info,
+  ChevronDown, ChevronRight, Code2, Loader2, Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,17 +11,18 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 
 const SEVERITY_CONFIG: Record<string, { textColor: string; bg: string; border: string; icon: React.ElementType; label: string }> = {
-  critical: { textColor: "text-red-400",    bg: "bg-red-500/10",    border: "border-red-500/30",    icon: XCircle,       label: "Critical" },
-  high:     { textColor: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30", icon: AlertTriangle, label: "High" },
-  medium:   { textColor: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/30", icon: Info,          label: "Medium" },
-  low:      { textColor: "text-blue-400",   bg: "bg-blue-500/10",   border: "border-blue-500/30",   icon: Info,          label: "Low" },
+  critical: { textColor: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30", icon: XCircle, label: "Critical" },
+  high: { textColor: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30", icon: AlertTriangle, label: "High" },
+  medium: { textColor: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/30", icon: Info, label: "Medium" },
+  low: { textColor: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/30", icon: Info, label: "Low" },
 };
 
 const RECOMMENDATION_CONFIG: Record<string, { label: string; description: string; color: string }> = {
-  "APPROVE":          { label: "Approved",           description: "No blocking issues. Code is ready to merge.",              color: "text-green-400 border-green-500/30" },
-  "REQUEST_CHANGES":  { label: "Changes Requested",  description: "Issues found that must be resolved before merging.",       color: "text-red-400 border-red-500/30" },
-  "COMMENT":          { label: "Commented",           description: "Suggestions provided — not blocking, but worth reviewing.", color: "text-yellow-400 border-yellow-500/30" },
-  "CONDITIONAL":      { label: "Conditional",         description: "Can merge after addressing the listed conditions.",         color: "text-yellow-400 border-yellow-500/30" },
+  APPROVE: { label: "Approved", description: "No blocking issues. Code is ready to merge.", color: "text-green-400 border-green-500/30" },
+  REQUEST_CHANGES: { label: "Changes Requested", description: "Issues found that must be resolved before merging.", color: "text-red-400 border-red-500/30" },
+  NEEDS_DISCUSSION: { label: "Needs Discussion", description: "Review found concerns requiring engineering discussion.", color: "text-orange-400 border-orange-500/30" },
+  COMMENT: { label: "Commented", description: "Suggestions provided — not blocking, but worth reviewing.", color: "text-yellow-400 border-yellow-500/30" },
+  CONDITIONAL: { label: "Conditional", description: "Can merge after addressing the listed conditions.", color: "text-yellow-400 border-yellow-500/30" },
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -32,6 +33,31 @@ const CATEGORY_COLORS: Record<string, string> = {
   "test-coverage": "text-purple-400",
   maintainability: "text-green-400",
 };
+
+function normalizeSummary(reviewPayload: any) {
+  const summary = reviewPayload?.summary;
+  if (summary && typeof summary === "object") return summary;
+  return {
+    overall_risk: "medium",
+    what_changed: typeof summary === "string" ? summary : "Review completed.",
+    test_coverage_estimate: reviewPayload?.coverage_estimate ?? "Not available",
+    review_recommendation: reviewPayload?.recommendation ?? "CONDITIONAL",
+  };
+}
+
+function normalizeFindingRange(finding: any): string {
+  const start = Number(finding?.start_line ?? finding?.line);
+  const end = Number(finding?.end_line ?? finding?.line ?? start);
+  if (!Number.isFinite(start) || start <= 0) return "line ?";
+  if (!Number.isFinite(end) || end <= 0 || end === start) return `line ${start}`;
+  return `lines ${start}-${end}`;
+}
+
+function isActionableFinding(finding: any): boolean {
+  const message = String(finding?.message || "").trim().toLowerCase();
+  if (!message) return false;
+  return !["lgtm", "lgtm!", "looks good", "looks good to me", "no changes needed."].includes(message);
+}
 
 function RepoInput({ onSearch }: { onSearch: (owner: string, repo: string) => void }) {
   const [input, setInput] = useState("balaji-joulestowatts/simple-tasks");
@@ -73,6 +99,23 @@ function PRCard({ pr, owner, repo }: { pr: any; owner: string; repo: string }) {
   });
 
   const review = reviewMutation.data as any;
+  const reviewPayload = review?.review ?? {};
+  const summary = normalizeSummary(reviewPayload);
+  const recommendation = summary?.review_recommendation ?? reviewPayload?.recommendation ?? "CONDITIONAL";
+  const actionableFindings = useMemo(() => {
+    const findings = Array.isArray(reviewPayload?.findings) ? reviewPayload.findings : [];
+    return findings.filter(isActionableFinding);
+  }, [reviewPayload]);
+
+  const findingsByFile = useMemo(() => {
+    const findings = actionableFindings;
+    return findings.reduce((acc: Record<string, any[]>, finding: any) => {
+      const fileName = finding?.file || "unmapped";
+      if (!acc[fileName]) acc[fileName] = [];
+      acc[fileName].push(finding);
+      return acc;
+    }, {});
+  }, [actionableFindings]);
 
   return (
     <div className="floating-card p-4">
@@ -97,8 +140,7 @@ function PRCard({ pr, owner, repo }: { pr: any; owner: string; repo: string }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {review && (() => {
-            const recKey = review.review?.summary?.review_recommendation ?? "COMMENT";
-            const recCfg = RECOMMENDATION_CONFIG[recKey] ?? RECOMMENDATION_CONFIG["COMMENT"];
+            const recCfg = RECOMMENDATION_CONFIG[recommendation] ?? RECOMMENDATION_CONFIG.COMMENT;
             return (
               <div className="text-right">
                 <Badge className={`text-xs border ${recCfg.color}`}>{recCfg.label}</Badge>
@@ -110,13 +152,14 @@ function PRCard({ pr, owner, repo }: { pr: any; owner: string; repo: string }) {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => { reviewMutation.mutate(); setExpanded(true); }}
+              onClick={() => {
+                reviewMutation.mutate();
+                setExpanded(true);
+              }}
               disabled={reviewMutation.isPending}
               className="text-xs"
             >
-              {reviewMutation.isPending ? (
-                <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Reviewing...</>
-              ) : "AI Review"}
+              {reviewMutation.isPending ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Reviewing...</> : "AI Review"}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={() => setExpanded(!expanded)}>
@@ -134,14 +177,13 @@ function PRCard({ pr, owner, repo }: { pr: any; owner: string; repo: string }) {
             className="overflow-hidden"
           >
             <div className="mt-4 pt-4 border-t border-border/50 space-y-4">
-              {/* Summary */}
               <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
-                <p className="text-sm font-medium mb-1">{review.review?.summary?.what_changed}</p>
+                <p className="text-sm font-medium mb-1">{summary?.what_changed}</p>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2 flex-wrap">
-                  <span>Coverage: {review.review?.summary?.test_coverage_estimate}</span>
+                  <span>Coverage: {summary?.test_coverage_estimate}</span>
+                  <span>Risk: {(summary?.overall_risk || "medium").toUpperCase()}</span>
                   {(() => {
-                    const recKey = review.review?.summary?.review_recommendation ?? "COMMENT";
-                    const recCfg = RECOMMENDATION_CONFIG[recKey] ?? RECOMMENDATION_CONFIG["COMMENT"];
+                    const recCfg = RECOMMENDATION_CONFIG[recommendation] ?? RECOMMENDATION_CONFIG.COMMENT;
                     return (
                       <div className="flex items-center gap-1.5">
                         <Badge variant="outline" className={`text-xs ${recCfg.color}`}>{recCfg.label}</Badge>
@@ -152,70 +194,89 @@ function PRCard({ pr, owner, repo }: { pr: any; owner: string; repo: string }) {
                 </div>
               </div>
 
-              {/* Findings */}
-              {review.review?.findings?.length > 0 && (
+              {Object.keys(findingsByFile).length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                    {review.review.findings.length} Findings
+                    {actionableFindings.length} Findings
                   </p>
-                  <div className="space-y-2">
-                    {review.review.findings.map((f: any, i: number) => {
-                      const cfg = SEVERITY_CONFIG[f.severity?.toLowerCase()] || SEVERITY_CONFIG.low;
-                      const Icon = cfg.icon;
-                      return (
-                        <div key={i} className={`p-3 rounded-lg border ${cfg.bg} ${cfg.border}`}>
-                          <div className="flex items-start gap-2">
-                            <Icon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${cfg.textColor}`} />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <span className={`text-[10px] font-bold uppercase tracking-wide ${cfg.textColor}`}>{cfg.label}</span>
-                                {f.file && (
-                                  <code className="text-[10px] bg-muted/50 px-1 rounded text-foreground/70">{f.file}{f.line ? `:${f.line}` : ""}</code>
-                                )}
-                                {f.category && (
-                                  <span className={`text-[10px] font-medium ${CATEGORY_COLORS[f.category] || "text-muted-foreground"}`}>{f.category}</span>
-                                )}
-                              </div>
-                              <p className="text-xs text-foreground/90">{f.message}</p>
-                              {f.suggestion && (
-                                <p className="mt-1 text-[11px] text-muted-foreground italic">{f.suggestion}</p>
-                              )}
-                            </div>
-                          </div>
+                  <div className="space-y-3">
+                    {(Object.entries(findingsByFile) as Array<[string, any[]]>).map(([fileName, groupedFindings]) => (
+                      <div key={fileName} className="rounded-lg border border-border/40 p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <code className="text-[11px] bg-muted/40 px-2 py-1 rounded text-foreground/80">{fileName}</code>
+                          <span className="text-[10px] text-muted-foreground">{groupedFindings.length} issue(s)</span>
                         </div>
-                      );
-                    })}
+                        <div className="space-y-2">
+                          {groupedFindings.map((f: any, i: number) => {
+                            const cfg = SEVERITY_CONFIG[f.severity?.toLowerCase()] || SEVERITY_CONFIG.low;
+                            const Icon = cfg.icon;
+                            return (
+                              <div key={`${fileName}-${i}`} className={`p-3 rounded-lg border ${cfg.bg} ${cfg.border}`}>
+                                <div className="flex items-start gap-2">
+                                  <Icon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${cfg.textColor}`} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                      <span className={`text-[10px] font-bold uppercase tracking-wide ${cfg.textColor}`}>{cfg.label}</span>
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-foreground/70">
+                                        {normalizeFindingRange(f)}
+                                      </span>
+                                      {f.category && (
+                                        <span className={`text-[10px] font-medium ${CATEGORY_COLORS[f.category] || "text-muted-foreground"}`}>{f.category}</span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-foreground/90">{f.message}</p>
+                                    {f.suggestion && (
+                                      <p className="mt-1 text-[11px] text-muted-foreground italic">{f.suggestion}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Security flags */}
-              {review.review?.security_flags?.length > 0 && (
+              {Object.keys(findingsByFile).length === 0 && (
+                <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/20 text-xs text-muted-foreground">
+                  No material issues found in reviewed hunks.
+                </div>
+              )}
+
+              {reviewPayload?.security_flags?.length > 0 && (
                 <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20">
                   <div className="flex items-center gap-2 mb-2">
                     <Shield className="h-4 w-4 text-red-400" />
                     <span className="text-xs font-medium text-red-400">Security Flags</span>
                   </div>
                   <ul className="space-y-1">
-                    {review.review.security_flags.map((f: string, i: number) => (
+                    {reviewPayload.security_flags.map((f: string, i: number) => (
                       <li key={i} className="text-xs text-muted-foreground">• {f}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {/* Positive observations */}
-              {review.review?.positive_observations?.length > 0 && (
+              {(reviewPayload?.positive_observations?.length > 0 || reviewPayload?.positives?.length > 0) && (
                 <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/20">
                   <div className="flex items-center gap-2 mb-2">
                     <CheckCircle className="h-4 w-4 text-green-400" />
                     <span className="text-xs font-medium text-green-400">Positive Observations</span>
                   </div>
                   <ul className="space-y-1">
-                    {review.review.positive_observations.map((o: string, i: number) => (
+                    {(reviewPayload.positive_observations || reviewPayload.positives || []).map((o: string, i: number) => (
                       <li key={i} className="text-xs text-muted-foreground">• {o}</li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {reviewPayload?.meta && (
+                <div className="text-[10px] text-muted-foreground border-t border-border/30 pt-2">
+                  Engine: {reviewPayload.meta.engine_version || "v1"} • Files reviewed: {reviewPayload.meta.files_reviewed ?? "-"}
                 </div>
               )}
             </div>
@@ -275,11 +336,7 @@ export default function CodeReview() {
         )}
 
         {prs.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-6 space-y-3"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">{prs.length} Open Pull Requests</p>
               <span className="text-xs text-muted-foreground">Click "AI Review" on any PR to analyse the diff</span>

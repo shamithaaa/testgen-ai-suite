@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     CORS_ORIGINS: list[str] = ["http://localhost:8080", "http://localhost:5173"]
 
+    # PR Review Engine
+    PR_REVIEW_V2_ENABLED: bool = True
+    PR_REVIEW_MAX_FILES: int = 15
+    PR_REVIEW_MAX_PATCH_CHARS: int = 3000
+    PR_REVIEW_MAX_HUNKS_PER_FILE: int = 8
+
     @property
     def jira_base_url(self) -> str:
         """Extract clean Jira base URL from potentially messy JIRA_DOMAIN value."""
