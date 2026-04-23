@@ -353,6 +353,8 @@ TEST CREDENTIALS: Not provided.
 Use placeholder values but add a comment in the description that real credentials are needed.
 """
 
+    pref_string = f"USER TEST PREFERENCES:\n{test_preferences}\n\nPrioritize generating tests that match the preferences above.\n" if test_preferences else ""
+
     prompt = f"""You are a senior Playwright test automation engineer with deep expertise in React, Radix UI, and modern component libraries.
 
 TARGET URL: {target_url}
@@ -362,8 +364,7 @@ APPLICATION ANALYSIS:
 
 Generate comprehensive Playwright test cases that cover the pages and user flows above.
 
-{f"USER TEST PREFERENCES:\\n{test_preferences}\\n\\nPrioritize generating tests that match the preferences above." if test_preferences else ""}
-
+{pref_string}
 Return ONLY valid JSON (no markdown) with exactly this shape:
 {{
   "tests": [
@@ -641,14 +642,14 @@ Base priority on: failure frequency, severity, recent failures, and potential im
 # ─── NEW: SDLC Intelligence prompts ────────────────────────────────────────
 
 
-async def review_pull_request(pr_title: str, pr_body: str, files: list[dict]) -> dict[str, Any]:
+async def review_pull_request(pr_title: str, pr_body: str, files: list[dict], custom_rules: str | None = None) -> dict[str, Any]:
   """AI code review for a GitHub pull request with safe v2->legacy fallback."""
   if not settings.PR_REVIEW_V2_ENABLED:
-    return await _review_pull_request_legacy(pr_title, pr_body, files)
+    return await _review_pull_request_legacy(pr_title, pr_body, files, custom_rules)
   try:
-    return await _review_pull_request_v2(pr_title, pr_body, files)
+    return await _review_pull_request_v2(pr_title, pr_body, files, custom_rules)
   except Exception:
-    return await _review_pull_request_legacy(pr_title, pr_body, files)
+    return await _review_pull_request_legacy(pr_title, pr_body, files, custom_rules)
 
 
 _OSS_SUMMARIZE_FILE_DIFF_PROMPT = """## GitHub PR Title
@@ -736,6 +737,8 @@ For fixes, use `diff` code blocks, marking changes with `+` or `-`. The line num
 
 If there are no issues found on a line range, you MUST respond with the
 text `LGTM!` for that line range in the review section.
+
+$custom_rules_section
 
 ## Changes made to `$filename` for your review
 
@@ -855,7 +858,7 @@ def _normalize_findings(file_name: str, patch: str, findings: list[dict[str, Any
   return normalized
 
 
-async def _review_pull_request_v2(pr_title: str, pr_body: str, files: list[dict]) -> dict[str, Any]:
+async def _review_pull_request_v2(pr_title: str, pr_body: str, files: list[dict], custom_rules: str | None = None) -> dict[str, Any]:
   files_limit = max(1, settings.PR_REVIEW_MAX_FILES)
   patch_limit = max(500, settings.PR_REVIEW_MAX_PATCH_CHARS)
   hunks_limit = max(1, settings.PR_REVIEW_MAX_HUNKS_PER_FILE)
@@ -902,9 +905,13 @@ async def _review_pull_request_v2(pr_title: str, pr_body: str, files: list[dict]
   aggregated_positives: list[str] = []
   all_findings: list[dict[str, Any]] = []
 
-  for file_obj in selected_files:
+  async def process_summary(file_obj):
+    summary_prompt_base = _OSS_SUMMARIZE_FILE_DIFF_PROMPT + "\n\n" + _OSS_TRIAGE_FILE_DIFF_PROMPT
+    if custom_rules:
+      summary_prompt_base += f"\n\nIMPORTANT: Take into account these TEAM GROUND RULES when deciding triage. If the diff violates any of these, you MUST output NEEDS_REVIEW:\n{custom_rules}"
+
     summary_prompt = _render_oss_prompt(
-      _OSS_SUMMARIZE_FILE_DIFF_PROMPT + "\n\n" + _OSS_TRIAGE_FILE_DIFF_PROMPT,
+      summary_prompt_base,
       {
         "title": pr_title,
         "description": pr_body[:1200] or "no description provided",
@@ -918,28 +925,34 @@ Return ONLY valid JSON:
   "triage": "NEEDS_REVIEW|APPROVED"
 }
 """
-    summary_raw = await _call_openai(summary_prompt, json_mode=True, task_name="Review Pull Request")
-    summary_data = json.loads(_clean_json(summary_raw))
+    try:
+      summary_raw = await _call_openai(summary_prompt, json_mode=True, task_name="Review Pull Request")
+      summary_data = json.loads(_clean_json(summary_raw))
+    except Exception:
+      summary_data = {}
+      
     triage = str(summary_data.get("triage") or "NEEDS_REVIEW").strip().upper()
     if triage not in {"NEEDS_REVIEW", "APPROVED"}:
       triage = "NEEDS_REVIEW"
     summary_text = str(summary_data.get("summary") or "Diff summarized.")
+    return file_obj, triage, summary_text
 
-    file_summaries.append(
-      {
-        "file": file_obj["filename"],
-        "summary": summary_text,
-        "triage": triage,
-      }
-    )
-
+  summary_results = await asyncio.gather(*(process_summary(f) for f in selected_files))
+  for file_obj, triage, summary_text in summary_results:
+    file_summaries.append({
+      "file": file_obj["filename"],
+      "summary": summary_text,
+      "triage": triage,
+    })
     if triage == "NEEDS_REVIEW":
       review_targets.append(file_obj)
 
   if not review_targets:
     review_targets = selected_files[: max(1, min(2, len(selected_files)))]
 
-  for file_obj in review_targets:
+  short_summary_text = "\n".join([f"- {item['file']}: {item['summary']}" for item in file_summaries[:12]])
+
+  async def process_review(file_obj):
     hunks = _extract_hunks(file_obj["patch"], hunks_limit)
     patches_text = "\n\n".join(
       [
@@ -947,9 +960,8 @@ Return ONLY valid JSON:
         for h in hunks
       ]
     )
-    short_summary_text = "\n".join(
-      [f"- {item['file']}: {item['summary']}" for item in file_summaries[:12]]
-    )
+    custom_rules_section = f"## CRITICAL TEAM GROUND RULES\nThe team relies on you as the final gatekeeper for these rules. You MUST ruthlessly critique the diff hunks against these rules. If the updated code violates ANY of the following constraints, you must explicitly flag it as a finding with a HIGH or CRITICAL severity. DO NOT ignore these:\n\n{custom_rules}\n" if custom_rules else ""
+
     review_prompt = _render_oss_prompt(
       _OSS_REVIEW_FILE_DIFF_PROMPT,
       {
@@ -958,6 +970,7 @@ Return ONLY valid JSON:
         "short_summary": short_summary_text or "No summary available.",
         "filename": file_obj["filename"],
         "patches": patches_text,
+        "custom_rules_section": custom_rules_section,
       },
     ) + """
 
@@ -977,9 +990,16 @@ Return ONLY valid JSON with exactly this shape:
   "positive_observations": ["string"]
 }
 """
-    review_raw = await _call_openai(review_prompt, json_mode=True, task_name="Review Pull Request")
-    review_data = json.loads(_clean_json(review_raw))
+    try:
+      review_raw = await _call_openai(review_prompt, json_mode=True, task_name="Review Pull Request")
+      review_data = json.loads(_clean_json(review_raw))
+    except Exception:
+      review_data = {}
+    return file_obj, review_data
 
+  review_results = await asyncio.gather(*(process_review(f) for f in review_targets))
+  
+  for file_obj, review_data in review_results:
     findings = review_data.get("findings") or []
     if isinstance(findings, list):
       all_findings.extend(_normalize_findings(file_obj["filename"], file_obj["patch"], findings))
@@ -1039,17 +1059,20 @@ Return ONLY valid JSON:
   }
 
 
-async def _review_pull_request_legacy(pr_title: str, pr_body: str, files: list[dict]) -> dict[str, Any]:
+async def _review_pull_request_legacy(pr_title: str, pr_body: str, files: list[dict], custom_rules: str | None = None) -> dict[str, Any]:
   """Legacy single-pass PR review path kept for fallback compatibility."""
   diff_text = "\n\n".join(
     f"=== {f['filename']} (+{f['additions']} -{f['deletions']}) ===\n{f.get('patch', '')[:3000]}"
     for f in files[:15]
   )
+  
+  custom_rules_section = f"\nTEAM GROUND RULES TO ENFORCE:\n{custom_rules}\n" if custom_rules else ""
+  
   prompt = f"""You are a senior software engineer performing a thorough code review.
 
 PR TITLE: {pr_title}
 PR DESCRIPTION: {pr_body[:1000]}
-
+{custom_rules_section}
 DIFF:
 {diff_text[:20000]}
 

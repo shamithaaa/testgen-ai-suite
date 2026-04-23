@@ -30,9 +30,11 @@ import { toast } from "sonner";
 function ConnectForm({
   initialRepoUrl,
   initialBranch,
+  onConnected,
 }: {
   initialRepoUrl?: string;
   initialBranch?: string;
+  onConnected?: (args: { githubUrl: string; branch: string; pat?: string }) => void;
 } = {}) {
   const [repoUrl, setRepoUrl] = useState(initialRepoUrl ?? "");
   const [branch, setBranch] = useState(initialBranch ?? "main");
@@ -52,6 +54,7 @@ function ConnectForm({
         pat: pat || undefined,
       });
       setWorkspace(result);
+      onConnected?.({ githubUrl: url, branch, pat: pat || undefined });
       toast.success("Repository connected");
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || "Failed to connect repository");
@@ -157,6 +160,7 @@ interface WorkspaceLayoutProps {
   onTestsGenerated?: (tests: import("@/lib/api").WorkspacePlaywrightTest[]) => void;
   initialRepoUrl?: string;
   initialBranch?: string;
+  onConnected?: (args: { githubUrl: string; branch: string; pat?: string }) => void;
 }
 
 export function WorkspaceLayout({
@@ -164,6 +168,7 @@ export function WorkspaceLayout({
   onTestsGenerated,
   initialRepoUrl,
   initialBranch,
+  onConnected,
 }: WorkspaceLayoutProps = {}) {
   const { workspace } = useWorkspaceContext();
   const [showCommit, setShowCommit] = useState(false);
@@ -172,7 +177,7 @@ export function WorkspaceLayout({
   const [centerMode, setCenterMode] = useState<"code" | "tree">("code");
 
   if (!workspace)
-    return <ConnectForm initialRepoUrl={initialRepoUrl} initialBranch={initialBranch} />;
+    return <ConnectForm initialRepoUrl={initialRepoUrl} initialBranch={initialBranch} onConnected={onConnected} />;
 
   const isTreeMode = centerMode === "tree";
 

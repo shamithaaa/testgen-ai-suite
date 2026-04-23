@@ -15,6 +15,7 @@ export interface PipelineState {
   owner: string;
   repo: string;
   branch: string;
+  githubPat: string;
   workspaceId: string | null;
   // Stage 2 — Commit
   commitSha: string | null;
@@ -37,7 +38,8 @@ export interface PipelineState {
 }
 
 interface PipelineCtxValue extends PipelineState {
-  setWorkspaceInfo: (info: { repoUrl: string; owner: string; repo: string; branch: string; workspaceId: string }) => void;
+  setWorkspaceInfo: (info: { repoUrl: string; owner: string; repo: string; branch: string; workspaceId: string; githubPat?: string }) => void;
+  setGithubPat: (pat: string) => void;
   setCommit: (sha: string, message: string, url: string) => void;
   setReviewResult: (result: PipelineState["reviewResult"]) => void;
   setReviewStatus: (s: PipelineState["reviewStatus"]) => void;
@@ -54,6 +56,7 @@ const defaultState: PipelineState = {
   repoUrl: "https://github.com/balaji-joulestowatts/simple-tasks",
   owner: "balaji-joulestowatts",
   repo: "simple-tasks",
+  githubPat: "",
   branch: "main", workspaceId: null,
   commitSha: null, commitMessage: null, commitUrl: null,
   reviewResult: null, reviewStatus: "idle",
@@ -74,8 +77,12 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  const setWorkspaceInfo = useCallback((info: { repoUrl: string; owner: string; repo: string; branch: string; workspaceId: string }) => {
+  const setWorkspaceInfo = useCallback((info: { repoUrl: string; owner: string; repo: string; branch: string; workspaceId: string; githubPat?: string }) => {
     update({ ...info });
+  }, [update]);
+
+  const setGithubPat = useCallback((githubPat: string) => {
+    update({ githubPat });
   }, [update]);
 
   const setCommit = useCallback((sha: string, message: string, url: string) => {
@@ -126,6 +133,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     <PipelineCtx.Provider value={{
       ...state,
       setWorkspaceInfo, setCommit,
+      setGithubPat,
       setReviewResult, setReviewStatus,
       setDeployedUrl,
       setTestSuite, setLiveTestSummary, setReportResult,

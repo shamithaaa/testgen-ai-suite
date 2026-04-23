@@ -115,6 +115,7 @@ export function StageDeployment() {
     setCommit,
     completeStage,
     goToStage,
+    githubPat,
   } = usePipelineContext();
 
   const [deploymentId, setDeploymentId] = useState<string | null>(null);
@@ -253,6 +254,7 @@ export function StageDeployment() {
         branch: branch || "main",
         commit_sha: commitToDeploy || undefined,
         target: "production",
+        github_pat: githubPat || undefined,
       });
 
       if (commitToDeploy) {

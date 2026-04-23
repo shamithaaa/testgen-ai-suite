@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { GephiSigmaGraph } from "@/components/workspace/GephiSigmaGraph";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +53,7 @@ import {
   type WorkspaceTestStep,
 } from "@/lib/api";
 import { useWorkspaceContext } from "@/context/WorkspaceContext";
+import { usePipelineContext } from "@/context/PipelineContext";
 import { useCommitImpactTree } from "@/hooks/use-commit-impact";
 import { toast } from "sonner";
 
@@ -177,6 +179,41 @@ function deriveRootToLeafChain(
   const upstream = walkToRoot(focusPath, new Set());
   const downstream = walkToLeaf(focusPath, new Set());
   return [...upstream, ...downstream.slice(1)];
+}
+
+function deriveNeighborhoodSubset(
+  focusPath: string,
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  maxHops = 2,
+): Set<string> {
+  const nodeSet = new Set(nodes.map((n) => n.path));
+  const subset = new Set<string>();
+  if (!focusPath || !nodeSet.has(focusPath)) return subset;
+
+  const adjacency = new Map<string, string[]>();
+  for (const e of edges) {
+    if (!nodeSet.has(e.source) || !nodeSet.has(e.target)) continue;
+    if (!adjacency.has(e.source)) adjacency.set(e.source, []);
+    if (!adjacency.has(e.target)) adjacency.set(e.target, []);
+    adjacency.get(e.source)!.push(e.target);
+    adjacency.get(e.target)!.push(e.source);
+  }
+
+  const queue: Array<{ path: string; hops: number }> = [{ path: focusPath, hops: 0 }];
+  subset.add(focusPath);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current.hops >= maxHops) continue;
+    for (const next of adjacency.get(current.path) ?? []) {
+      if (subset.has(next)) continue;
+      subset.add(next);
+      queue.push({ path: next, hops: current.hops + 1 });
+    }
+  }
+
+  return subset;
 }
 
 // ── Playwright code formatter ─────────────────────────────────────────────────
@@ -425,6 +462,149 @@ function buildBranchFlow(
   return { nodes: rfNodes, edges: rfEdges };
 }
 
+function buildNeighborhoodFlow(
+  focusPath: string,
+  chain: string[],
+  graphNodes: GraphNode[],
+  graphEdges: GraphEdge[],
+  impactNodeMap: Map<string, CommitImpactTreeNode>,
+): { nodes: Node[]; edges: Edge[] } {
+  const nodeMap = new Map(graphNodes.map((n) => [n.path, n]));
+  const allSet = new Set(graphNodes.map((n) => n.path));
+  const subset = deriveNeighborhoodSubset(focusPath, graphNodes, graphEdges, 2);
+  if (subset.size === 0) return { nodes: [], edges: [] };
+
+  const parentMap = new Map<string, string[]>();
+  const childMap = new Map<string, string[]>();
+  for (const e of graphEdges) {
+    if (!allSet.has(e.source) || !allSet.has(e.target)) continue;
+    if (!parentMap.has(e.target)) parentMap.set(e.target, []);
+    parentMap.get(e.target)!.push(e.source);
+    if (!childMap.has(e.source)) childMap.set(e.source, []);
+    childMap.get(e.source)!.push(e.target);
+  }
+
+  // Distance from focus in directed space: downstream => positive, upstream => negative
+  const downstream = new Map<string, number>([[focusPath, 0]]);
+  const upstream = new Map<string, number>([[focusPath, 0]]);
+
+  const qDown: Array<{ path: string; d: number }> = [{ path: focusPath, d: 0 }];
+  while (qDown.length > 0) {
+    const cur = qDown.shift()!;
+    if (cur.d >= 2) continue;
+    for (const next of childMap.get(cur.path) ?? []) {
+      if (!subset.has(next) || downstream.has(next)) continue;
+      downstream.set(next, cur.d + 1);
+      qDown.push({ path: next, d: cur.d + 1 });
+    }
+  }
+
+  const qUp: Array<{ path: string; d: number }> = [{ path: focusPath, d: 0 }];
+  while (qUp.length > 0) {
+    const cur = qUp.shift()!;
+    if (cur.d >= 2) continue;
+    for (const prev of parentMap.get(cur.path) ?? []) {
+      if (!subset.has(prev) || upstream.has(prev)) continue;
+      upstream.set(prev, cur.d + 1);
+      qUp.push({ path: prev, d: cur.d + 1 });
+    }
+  }
+
+  const layerMap = new Map<string, number>();
+  for (const p of subset) {
+    if (p === focusPath) {
+      layerMap.set(p, 0);
+      continue;
+    }
+    const dn = downstream.get(p);
+    const up = upstream.get(p);
+    if (dn !== undefined && dn > 0) layerMap.set(p, dn);
+    else if (up !== undefined && up > 0) layerMap.set(p, -up);
+    else layerMap.set(p, 0);
+  }
+
+  const chainIndex = new Map<string, number>();
+  chain.forEach((p, i) => chainIndex.set(p, i));
+
+  const groups = new Map<number, string[]>();
+  for (const p of subset) {
+    const layer = layerMap.get(p) ?? 0;
+    if (!groups.has(layer)) groups.set(layer, []);
+    groups.get(layer)!.push(p);
+  }
+
+  for (const [, arr] of groups) {
+    arr.sort((a, b) => {
+      const ai = chainIndex.has(a) ? chainIndex.get(a)! : Number.MAX_SAFE_INTEGER;
+      const bi = chainIndex.has(b) ? chainIndex.get(b)! : Number.MAX_SAFE_INTEGER;
+      if (ai !== bi) return ai - bi;
+      return a.localeCompare(b);
+    });
+  }
+
+  const orderedLayers = [...groups.keys()].sort((a, b) => a - b);
+  const minLayer = orderedLayers[0] ?? 0;
+
+  const rfNodes: Node[] = [];
+  for (const layer of orderedLayers) {
+    const arr = groups.get(layer) ?? [];
+    arr.forEach((path, idx) => {
+      const impact = impactNodeMap.get(path);
+      const graph = nodeMap.get(path);
+      const status = impact?.status && impact.status !== " " ? impact.status : undefined;
+      rfNodes.push({
+        id: path,
+        type: "treeFlowNode",
+        position: { x: (layer - minLayer) * (NODE_W + X_GAP), y: idx * Y_GAP },
+        data: {
+          label: path.split("/").pop() ?? path,
+          path,
+          status,
+          isRoot: chain.length > 0 ? path === chain[0] : false,
+          isLeaf: chain.length > 0 ? path === chain[chain.length - 1] : path === focusPath,
+          isEntry: impact?.is_entry ?? false,
+          depth: impact?.depth ?? graph?.layer ?? 0,
+          importsCount: impact?.imports_count ?? 0,
+          impactedByCount: impact?.impacted_by_count ?? 0,
+        } as FlowNodeData,
+        draggable: false,
+        selectable: true,
+        style: { width: NODE_W, height: NODE_H },
+      });
+    });
+  }
+
+  const chainEdges = new Set<string>();
+  for (let i = 0; i < chain.length - 1; i += 1) {
+    chainEdges.add(`${chain[i]}->${chain[i + 1]}`);
+  }
+
+  const rfEdges: Edge[] = [];
+  for (const e of graphEdges) {
+    if (!subset.has(e.source) || !subset.has(e.target)) continue;
+    const highlighted = chainEdges.has(`${e.source}->${e.target}`);
+    rfEdges.push({
+      id: `e-${e.source}-${e.target}`,
+      source: e.source,
+      target: e.target,
+      type: "step",
+      animated: highlighted,
+      style: {
+        stroke: highlighted ? "#f97316" : "hsl(var(--border))",
+        strokeWidth: highlighted ? 2.2 : 1.4,
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 12,
+        height: 12,
+        color: highlighted ? "#f97316" : "hsl(var(--border))",
+      },
+    });
+  }
+
+  return { nodes: rfNodes, edges: rfEdges };
+}
+
 // ── Custom React Flow node ────────────────────────────────────────────────────
 
 const TreeFlowNode = memo(({ data, selected }: NodeProps) => {
@@ -512,13 +692,14 @@ interface FlowCanvasProps {
   graphNodes: GraphNode[];
   graphEdges: GraphEdge[];
   impactNodeMap: Map<string, CommitImpactTreeNode>;
+  viewMode: "chain" | "neighborhood";
 }
 
-function FlowCanvas({ focusPath, chain, graphNodes, graphEdges, impactNodeMap }: FlowCanvasProps) {
+function FlowCanvas({ focusPath, chain, graphNodes, graphEdges, impactNodeMap, viewMode }: FlowCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
-  const chainKey = `${focusPath}|${chain.join("|")}|${graphNodes.length}|${graphEdges.length}`;
+  const chainKey = `${focusPath}|${viewMode}|${chain.join("|")}|${graphNodes.length}|${graphEdges.length}`;
 
   useEffect(() => {
     if (chain.length === 0) {
@@ -526,7 +707,10 @@ function FlowCanvas({ focusPath, chain, graphNodes, graphEdges, impactNodeMap }:
       setEdges([]);
       return;
     }
-    const { nodes: n, edges: e } = buildBranchFlow(focusPath, chain, graphNodes, graphEdges, impactNodeMap);
+    const { nodes: n, edges: e } =
+      viewMode === "neighborhood"
+        ? buildNeighborhoodFlow(focusPath, chain, graphNodes, graphEdges, impactNodeMap)
+        : buildBranchFlow(focusPath, chain, graphNodes, graphEdges, impactNodeMap);
     setNodes(n);
     setEdges(e);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -755,12 +939,14 @@ export function TreeFlowView({
 } = {}) {
   const { workspace } = useWorkspaceContext();
   const { activeTab } = useWorkspaceContext();
-  const impactQuery = useCommitImpactTree(workspace?.workspace_id ?? null, 5);
+  const { githubPat } = usePipelineContext();
+  const impactQuery = useCommitImpactTree(workspace?.workspace_id ?? null, 5, githubPat || undefined);
   const fallbackGraphQuery = useQuery({
     queryKey: ["tree-flow-fallback-graph", workspace?.workspace_id],
     queryFn: () =>
       impactApi.buildWorkspaceGraph({
         workspace_id: workspace!.workspace_id,
+        pat: githubPat || undefined,
       }),
     enabled: !!workspace?.workspace_id,
     staleTime: 5 * 60 * 1000,
@@ -770,6 +956,7 @@ export function TreeFlowView({
   const [generatingTests, setGeneratingTests] = useState(false);
   const [generatingFile, setGeneratingFile] = useState<string | null>(null);
   const [fileTests, setFileTests] = useState<FileTestGroup[] | null>(null);
+  const [flowViewMode, setFlowViewMode] = useState<"chain" | "neighborhood" | "gephi">("gephi");
   const [dialogPhase, setDialogPhase] = useState<"closed" | "analyzing" | "review">("closed");
   const [perFileAnalysis, setPerFileAnalysis] = useState<
     Array<FileChainAnalysis & { requestedCount: number; isLeaf: boolean; isRoot: boolean }>
@@ -801,6 +988,16 @@ export function TreeFlowView({
     if (impactChain.length > 0) return impactChain;
     return activeTab ? [activeTab] : [];
   }, [impactChain, fallbackChain, activeTab]);
+
+  const changedPathSet = useMemo(() => {
+    const changed = new Set<string>();
+    const graphNodes = fallbackGraphQuery.data?.nodes ?? [];
+    for (const node of graphNodes) {
+      if (node.is_changed) changed.add(node.path);
+    }
+    for (const path of impactNodeMap.keys()) changed.add(path);
+    return changed;
+  }, [fallbackGraphQuery.data?.nodes, impactNodeMap]);
 
   // Clear tests when chain changes
   useEffect(() => {
@@ -955,6 +1152,47 @@ export function TreeFlowView({
             <span className="text-xs font-semibold text-foreground/80 flex-shrink-0">
               Root → Leaf
             </span>
+            <div className="flex items-center gap-1 ml-1">
+              <button
+                type="button"
+                className={cn(
+                  "h-5 px-2 rounded text-[10px] border transition-colors",
+                  flowViewMode === "gephi"
+                    ? "border-primary/50 bg-primary/10 text-primary"
+                    : "border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/40",
+                )}
+                onClick={() => setFlowViewMode("gephi")}
+                title="Gephi-style force graph with clusters"
+              >
+                Gephi
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "h-5 px-2 rounded text-[10px] border transition-colors",
+                  flowViewMode === "neighborhood"
+                    ? "border-primary/50 bg-primary/10 text-primary"
+                    : "border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/40",
+                )}
+                onClick={() => setFlowViewMode("neighborhood")}
+                title="Show nearby dependency flow around selected file"
+              >
+                Flow
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "h-5 px-2 rounded text-[10px] border transition-colors",
+                  flowViewMode === "chain"
+                    ? "border-primary/50 bg-primary/10 text-primary"
+                    : "border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/40",
+                )}
+                onClick={() => setFlowViewMode("chain")}
+                title="Show strict root-to-leaf chain only"
+              >
+                Chain
+              </button>
+            </div>
             {chain.length > 0 && (
               <span className="text-[10px] text-muted-foreground/50 bg-muted/40 px-1.5 py-0.5 rounded flex-shrink-0">
                 {chain.length} node{chain.length !== 1 ? "s" : ""}
@@ -1006,13 +1244,23 @@ export function TreeFlowView({
             </p>
           </div>
         ) : (
-          <FlowCanvas
-            focusPath={activeTab}
-            chain={chain}
-            graphNodes={fallbackGraphQuery.data?.nodes ?? []}
-            graphEdges={fallbackGraphQuery.data?.edges ?? []}
-            impactNodeMap={impactNodeMap}
-          />
+          flowViewMode === "gephi" ? (
+            <GephiSigmaGraph
+              focusPath={activeTab}
+              nodes={fallbackGraphQuery.data?.nodes ?? []}
+              edges={fallbackGraphQuery.data?.edges ?? []}
+              changedPaths={changedPathSet}
+            />
+          ) : (
+            <FlowCanvas
+              focusPath={activeTab}
+              chain={chain}
+              graphNodes={fallbackGraphQuery.data?.nodes ?? []}
+              graphEdges={fallbackGraphQuery.data?.edges ?? []}
+              impactNodeMap={impactNodeMap}
+              viewMode={flowViewMode}
+            />
+          )
         )}
       </div>
 

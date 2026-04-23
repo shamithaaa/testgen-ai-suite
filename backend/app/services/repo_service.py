@@ -116,15 +116,25 @@ def cleanup_repo(repo_path: str) -> None:
     shutil.rmtree(repo_path, ignore_errors=True)
 
 
-def get_repo_commits(github_url: str, n: int = 10) -> list[dict]:
+def _inject_pat(github_url: str, pat: str | None = None) -> str:
+    if not pat:
+        return github_url
+    url = github_url.rstrip("/")
+    if url.startswith("https://"):
+        return url.replace("https://", f"https://{pat}@", 1)
+    return github_url
+
+
+def get_repo_commits(github_url: str, n: int = 10, pat: str | None = None) -> list[dict]:
     """
     Shallow-clone a repo, read the last n commits, clean up.
     Returns a list of commit dicts: sha, short_sha, message, author, relative_date, date.
     """
     temp_dir = tempfile.mkdtemp(prefix="testgen_commits_")
     try:
+        clone_url = _inject_pat(github_url, pat)
         result = subprocess.run(
-            ["git", "clone", f"--depth={n + 2}", "--single-branch", github_url, temp_dir],
+            ["git", "clone", f"--depth={n + 2}", "--single-branch", clone_url, temp_dir],
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode != 0:

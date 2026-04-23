@@ -57,10 +57,11 @@ async def fetch_commits(body: dict = Body(...)):
     Used by the frontend commit-picker before starting an analysis.
     """
     github_url = body.get("github_url", "").strip()
+    pat = (body.get("pat") or "").strip() or None
     if not github_url:
         raise HTTPException(status_code=400, detail="github_url is required")
     try:
-        commits = await asyncio.to_thread(repo_service.get_repo_commits, github_url, 10)
+        commits = await asyncio.to_thread(repo_service.get_repo_commits, github_url, 10, pat)
         return {"commits": commits}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))

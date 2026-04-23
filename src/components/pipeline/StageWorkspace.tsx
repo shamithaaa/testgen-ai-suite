@@ -23,9 +23,14 @@ function WorkspaceWithCapture() {
         repo: parts[1] ?? "",
         branch: workspace.branch,
         workspaceId: workspace.workspace_id,
+        githubPat: pipeline.githubPat,
       });
     }
   }, [workspace, pipeline.workspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleWorkspaceConnected = useCallback(({ pat }: { githubUrl: string; branch: string; pat?: string }) => {
+    pipeline.setGithubPat(pat ?? "");
+  }, [pipeline]);
 
   const handleCommitSuccess = useCallback((sha: string, url: string) => {
     pipeline.setCommit(sha, "", url);
@@ -73,6 +78,7 @@ function WorkspaceWithCapture() {
           files: changedFiles,
           message: commitMsg,
           new_file_contents: newFileContents,
+          github_pat: pipeline.githubPat || undefined,
         });
 
         pipeline.setCommit(result.sha, result.message, result.github_url);
@@ -155,6 +161,7 @@ function WorkspaceWithCapture() {
           onTestsGenerated={handleTestsGenerated}
           initialRepoUrl={pipeline.repoUrl || undefined}
           initialBranch={pipeline.branch || undefined}
+          onConnected={handleWorkspaceConnected}
         />
       </div>
     </div>

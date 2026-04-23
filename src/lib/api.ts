@@ -566,6 +566,7 @@ export interface CommitRequest {
   author_name?: string;
   author_email?: string;
   new_file_contents: Record<string, string>;
+  github_pat?: string;
 }
 
 export interface CommitResult {
@@ -837,6 +838,7 @@ export const api = {
     mode?: "full" | "commit",
     commit_sha?: string,
     commit_message?: string,
+    pat?: string,
   ) =>
     apiClient
       .post<{ job_id: string; status: string; mode: string }>("/repo/analyze", {
@@ -849,12 +851,13 @@ export const api = {
         mode: mode ?? "full",
         ...(commit_sha && { commit_sha }),
         ...(commit_message && { commit_message }),
+        ...(pat && { pat }),
       })
       .then((r) => r.data),
 
-  getRepoCommits: (github_url: string) =>
+  getRepoCommits: (github_url: string, pat?: string) =>
     apiClient
-      .post<{ commits: CommitInfo[] }>("/repo/commits", { github_url })
+      .post<{ commits: CommitInfo[] }>("/repo/commits", { github_url, ...(pat ? { pat } : {}) })
       .then((r) => r.data),
 
   getAnalysisJob: (jobId: string) =>
@@ -909,8 +912,8 @@ export const api = {
   getPRFiles: (owner: string, repo: string, prNumber: number) =>
     apiClient.get(`/github/pr/${prNumber}/files`, { params: { owner, repo } }).then((r) => r.data as any[]),
 
-  reviewPR: (owner: string, repo: string, prNumber: number) =>
-    apiClient.post(`/github/pr/${prNumber}/review`, null, { params: { owner, repo } }).then((r) => r.data),
+  reviewPR: (owner: string, repo: string, prNumber: number, customRules?: string) =>
+    apiClient.post(`/github/pr/${prNumber}/review`, { custom_rules: customRules || undefined }, { params: { owner, repo } }).then((r) => r.data),
 
   getWorkflowRuns: (owner: string, repo: string) =>
     apiClient.get("/github/workflow-runs", { params: { owner, repo } }).then((r) => r.data as any[]),
@@ -990,7 +993,11 @@ export const api = {
 
   // ── AI Workspace ──────────────────────────────────────────────────────────
   connectWorkspace: (github_url: string, branch: string, pat?: string) =>
-    apiClient.post<WorkspaceInfo>("/workspace/connect", { github_url, branch, pat }).then((r) => r.data),
+    apiClient.post<WorkspaceInfo>("/workspace/connect", { 
+      github_url, 
+      branch, 
+      ...(pat ? { pat } : {}) 
+    }).then((r) => r.data),
 
   getWorkspaceTree: (workspaceId: string) =>
     apiClient.get<{ workspace_id: string; tree: FileNode[] }>(`/workspace/${workspaceId}/tree`).then((r) => r.data),
@@ -1036,9 +1043,11 @@ export const api = {
   getGitDiff: (workspaceId: string, filePath: string) =>
     apiClient.get<{ diff: string }>("/git/diff", { params: { workspace_id: workspaceId, file_path: filePath } }).then((r) => r.data),
 
-  getCommitImpactTree: (workspaceId: string, maxDepth = 4) =>
+  getCommitImpactTree: (workspaceId: string, maxDepth = 4, pat?: string) =>
     apiClient
-      .get<CommitImpactTreeResponse>("/commit/impact-tree", { params: { workspace_id: workspaceId, max_depth: maxDepth } })
+      .get<CommitImpactTreeResponse>("/commit/impact-tree", {
+        params: { workspace_id: workspaceId, max_depth: maxDepth, ...(pat ? { pat } : {}) },
+      })
       .then((r) => r.data),
 
   createBranch: (payload: { workspace_id: string; branch_name: string; from_branch?: string }) =>
@@ -1092,9 +1101,9 @@ export const api = {
     apiClient.delete(`/tests/workspace-suites/${suite_id}`).then((r) => r.data),
 
   // ── Pipeline ──────────────────────────────────────────────────────────────
-  reviewCommit: (owner: string, repo: string, sha: string) =>
+  reviewCommit: (owner: string, repo: string, sha: string, pat?: string, customRules?: string) =>
     apiClient
-      .post(`/github/commits/${sha}/review`, null, { params: { owner, repo } })
+      .post(`/github/commits/${sha}/review`, { custom_rules: customRules || undefined }, { params: { owner, repo, ...(pat ? { pat } : {}) } })
       .then((r) => r.data as { sha: string; review: PipelineReview; files_reviewed: number }),
 
   evaluatePipeline: (payload: PipelineReportRequest) =>
@@ -1114,7 +1123,7 @@ export const api = {
       })
       .then((r) => r.data),
 
-  triggerDeployment: (payload: DeploymentTriggerRequest) =>
+  triggerDeployment: (payload: DeploymentTriggerRequest & { github_pat?: string }) =>
     apiClient.post<DeploymentTriggerResponse>("/deployments/trigger", payload).then((r) => r.data),
 
   getDeploymentStatus: (deploymentId: string) =>
@@ -1245,13 +1254,13 @@ export interface RunTestResponse {
 // ─── Code Impact + Test Intelligence API ─────────────────────────────────────
 
 export const impactApi = {
-  buildGraph: (payload: { owner: string; repo: string; pr_number?: number; commit_sha?: string }) =>
+  buildGraph: (payload: { owner: string; repo: string; pr_number?: number; commit_sha?: string; pat?: string }) =>
     apiClient.post<DependencyGraphResponse>("/impact/graph", payload).then((r) => r.data),
 
   getImpactPath: (payload: { nodes: GraphNode[]; edges: GraphEdge[]; focus_file: string }) =>
     apiClient.post<ImpactPathResponse>("/impact/impact-path", payload).then((r) => r.data),
 
-  getFileContent: (payload: { owner: string; repo: string; path: string; ref?: string }) =>
+  getFileContent: (payload: { owner: string; repo: string; path: string; ref?: string; pat?: string }) =>
     apiClient.post<FileContentResponse>("/impact/file-content", payload).then((r) => r.data),
 
   generateFromCode: (payload: {
@@ -1283,7 +1292,7 @@ export const impactApi = {
   runAllTests: (testIds: string[]) =>
     apiClient.post<RunTestResponse>("/impact/run-all-tests", testIds).then((r) => r.data),
 
-  buildWorkspaceGraph: (payload: { workspace_id: string; file_paths?: string[] }) =>
+  buildWorkspaceGraph: (payload: { workspace_id: string; file_paths?: string[]; pat?: string }) =>
     apiClient
       .post<WorkspaceGraphResponse>("/impact/workspace-graph", payload)
       .then((r) => r.data),

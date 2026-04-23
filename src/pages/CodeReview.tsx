@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   GitPullRequest, Search, Shield, AlertTriangle, CheckCircle, XCircle,
-  ChevronDown, ChevronRight, Code2, Loader2, Info,
+  ChevronDown, ChevronRight, Code2, Loader2, Info, BookOpen, FileUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,10 +92,10 @@ function RepoInput({ onSearch }: { onSearch: (owner: string, repo: string) => vo
   );
 }
 
-function PRCard({ pr, owner, repo }: { pr: any; owner: string; repo: string }) {
+function PRCard({ pr, owner, repo, customRules }: { pr: any; owner: string; repo: string; customRules?: string }) {
   const [expanded, setExpanded] = useState(false);
   const reviewMutation = useMutation({
-    mutationFn: () => api.reviewPR(owner, repo, pr.number),
+    mutationFn: () => api.reviewPR(owner, repo, pr.number, customRules),
   });
 
   const review = reviewMutation.data as any;
@@ -292,6 +292,20 @@ export default function CodeReview() {
     owner: "balaji-joulestowatts",
     repo: "simple-tasks",
   });
+  const [customRules, setCustomRules] = useState<string>("");
+  const [isRulesExpanded, setIsRulesExpanded] = useState(false);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setCustomRules(ev.target?.result as string);
+      setIsRulesExpanded(true);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const prsQuery = useQuery({
     queryKey: ["github-prs", repoCoords?.owner, repoCoords?.repo],
@@ -314,11 +328,70 @@ export default function CodeReview() {
         <RepoInput onSearch={(owner, repo) => setRepoCoords({ owner, repo })} />
 
         {repoCoords && (
-          <div className="mt-4 text-xs text-muted-foreground flex items-center gap-2">
+          <div className="mt-4 mb-4 text-xs text-muted-foreground flex items-center gap-2">
             <Code2 className="h-3.5 w-3.5" />
             <span>
               Viewing <strong className="text-foreground">{repoCoords.owner}/{repoCoords.repo}</strong>
             </span>
+          </div>
+        )}
+
+        {repoCoords && (
+          <div className="mb-6 rounded-xl border border-border/50 bg-card/50 overflow-hidden shadow-sm">
+            <div 
+              className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors"
+              onClick={() => setIsRulesExpanded(!isRulesExpanded)}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${customRules ? 'bg-indigo-500/10 text-indigo-500' : 'bg-muted text-muted-foreground'}`}>
+                  <BookOpen className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">Custom Ground Rules</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Enforce team-specific architectural or formatting constraints.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {customRules && <Badge variant="secondary" className="text-[10px] bg-indigo-500/10 text-indigo-500 border-indigo-500/20">Rules Active</Badge>}
+                <Button size="sm" variant="ghost" className="h-8 shadow-none" onClick={(e) => { e.stopPropagation(); setIsRulesExpanded(!isRulesExpanded); }}>
+                  {isRulesExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            
+            <AnimatePresence>
+              {isRulesExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-4 pt-0 border-t border-border/30 bg-muted/10">
+                    <div className="my-3 flex items-center justify-between">
+                      <label className="relative cursor-pointer group">
+                        <input type="file" accept=".md,.txt" className="hidden" onChange={handleFileUpload} />
+                        <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 bg-emerald-500/10 group-hover:bg-emerald-500/20 px-3 py-1.5 rounded-md transition-colors border border-emerald-500/20">
+                          <FileUp className="h-3.5 w-3.5" />
+                          Upload `.md` Rules
+                        </div>
+                      </label>
+                      {customRules && (
+                        <Button variant="ghost" size="sm" onClick={() => setCustomRules("")} className="h-7 text-xs text-muted-foreground hover:text-red-500">
+                          Clear Rules
+                        </Button>
+                      )}
+                    </div>
+                    <textarea 
+                      value={customRules}
+                      onChange={(e) => setCustomRules(e.target.value)}
+                      placeholder="Or directly paste your team's PR guidelines, formatting laws, or architectural constraints here. The AI will strictly critique against these."
+                      className="w-full h-36 px-4 py-3 text-[13px] font-mono border rounded-lg bg-background resize-none focus:ring-1 focus:ring-indigo-500/40 focus:border-indigo-500/40 outline-none leading-relaxed placeholder:text-muted-foreground/60 shadow-inner"
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
 
@@ -342,7 +415,7 @@ export default function CodeReview() {
               <span className="text-xs text-muted-foreground">Click "AI Review" on any PR to analyse the diff</span>
             </div>
             {prs.map((pr: any) => (
-              <PRCard key={pr.number} pr={pr} owner={repoCoords!.owner} repo={repoCoords!.repo} />
+              <PRCard key={pr.number} pr={pr} owner={repoCoords!.owner} repo={repoCoords!.repo} customRules={customRules} />
             ))}
           </motion.div>
         )}

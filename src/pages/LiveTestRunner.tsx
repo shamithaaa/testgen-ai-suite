@@ -57,6 +57,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useLiveTesting, useFetchCommits, useRunHistory, LiveTestingPhase } from "../hooks/use-live-testing";
+import { usePipelineContext } from "@/context/PipelineContext";
 import { PlaywrightTestCase, TestStep, LiveTestResult, StepResult, CommitInfo, RunSummaryItem, RepoAnalysisResult } from "../lib/api";
 import { downloadLiveTestReport, downloadRunSummaryReport } from "../lib/pdf-report";
 
@@ -794,6 +795,7 @@ function InputPhase({
   onAnalyze: (
     github: string, target: string, email?: string, password?: string, preferences?: string,
     numTests?: number, mode?: "full" | "commit", commitSha?: string, commitMessage?: string,
+    pat?: string,
   ) => void;
   onUploadSpec: (file: File, targetUrl: string, email?: string, password?: string) => void;
   isAnalyzing: boolean;
@@ -802,6 +804,14 @@ function InputPhase({
   initialGithubUrl?: string;
   initialAppUrl?: string;
 }) {
+  let pipelinePat: string | undefined;
+  try {
+    const ctx = usePipelineContext();
+    pipelinePat = ctx.githubPat;
+  } catch (e) {
+    // Outside pipeline context
+  }
+
   const [inputMode, setInputMode] = useState<"ai" | "upload">("ai");
   const [githubUrl, setGithubUrl] = useState(initialGithubUrl ?? "https://github.com/balaji-joulestowatts/simple-tasks");
   const [targetUrl, setTargetUrl] = useState(initialAppUrl ?? "https://simple-tasks-zeta.vercel.app/");
@@ -823,7 +833,7 @@ function InputPhase({
   const handleFetchCommits = () => {
     if (githubUrl.trim().startsWith("https://")) {
       setSelectedCommit(null);
-      fetchCommits.mutate(githubUrl.trim());
+      fetchCommits.mutate({ githubUrl: githubUrl.trim(), pat: pipelinePat });
     }
   };
 
@@ -1291,6 +1301,7 @@ function InputPhase({
                       testingScope,
                       selectedCommit?.sha,
                       selectedCommit?.message,
+                      undefined, // Explicitly pass undefined for PAT if not in pipeline context, or we'll get it from context in LiveTestRunner
                     );
                   }}
                 >
@@ -2081,6 +2092,14 @@ export default function LiveTestRunner({
   initialGithubUrl?: string;
   initialAppUrl?: string;
 } = {}) {
+  let pipelinePat: string | undefined;
+  try {
+    const ctx = usePipelineContext();
+    pipelinePat = ctx.githubPat;
+  } catch (e) {
+    // If used outside of PipelineProvider
+  }
+
   // Read sessionStorage prefill once on mount (from ViewEntryTree wizard)
   const prefill = useMemo(() => readAndClearPrefill(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2126,7 +2145,9 @@ export default function LiveTestRunner({
         {phase === "idle" && (
           <InputPhase
             key="input"
-            onAnalyze={(g, t, e, p, prefs, numTests, mode, sha, msg) => handleAnalyze(g, t, e, p, prefs, numTests, mode, sha, msg)}
+            onAnalyze={(g, t, e, p, prefs, numTests, mode, sha, msg, pat) => 
+               handleAnalyze(g, t, e, p, prefs, numTests, mode, sha, msg, pat || pipelinePat)
+            }
             onUploadSpec={(file, targetUrl, email, password) => handleUploadSpec(file, targetUrl, email, password)}
             isAnalyzing={isStarting}
             isParsing={isParsingSpec}

@@ -31,10 +31,24 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: proxyConfig,
   },
+  optimizeDeps: {
+    include: [
+      "react", 
+      "react-dom", 
+      "sigma", 
+      "@react-sigma/core", 
+      "graphology", 
+      "graphology-layout-forceatlas2",
+      "graphology-communities-louvain"
+    ],
+  },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "react": path.resolve(__dirname, "./node_modules/react"),
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
+      "react-dom/client": path.resolve(__dirname, "./node_modules/react-dom/client"),
     },
   },
 }));

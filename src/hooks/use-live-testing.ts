@@ -170,7 +170,7 @@ function injectCredentialsIntoTests(
 
 export function useFetchCommits() {
   return useMutation({
-    mutationFn: (githubUrl: string) => api.getRepoCommits(githubUrl),
+    mutationFn: ({ githubUrl, pat }: { githubUrl: string; pat?: string }) => api.getRepoCommits(githubUrl, pat),
   });
 }
 
@@ -199,6 +199,7 @@ export function useStartAnalyzeRepo() {
       mode,
       commitSha,
       commitMessage,
+      pat,
     }: {
       githubUrl: string;
       targetUrl: string;
@@ -209,10 +210,19 @@ export function useStartAnalyzeRepo() {
       mode?: "full" | "commit";
       commitSha?: string;
       commitMessage?: string;
+      pat?: string;
     }) =>
       api.startAnalyzeRepo(
-        githubUrl, targetUrl, testEmail, testPassword, testPreferences,
-        numTests, mode, commitSha, commitMessage,
+        githubUrl,
+        targetUrl,
+        testEmail,
+        testPassword,
+        testPreferences,
+        numTests,
+        mode,
+        commitSha,
+        commitMessage,
+        pat,
       ),
   });
 }
@@ -334,6 +344,7 @@ export function useLiveTesting() {
       mode?: "full" | "commit",
       commitSha?: string,
       commitMessage?: string,
+      pat?: string,
     ) => {
       setPhase("analyzing");
       setErrorMsg(null);
@@ -344,8 +355,16 @@ export function useLiveTesting() {
       prevJobStatus.current = null;
       try {
         const res = await startAnalyze.mutateAsync({
-          githubUrl, targetUrl, testEmail, testPassword, testPreferences,
-          numTests, mode, commitSha, commitMessage,
+          githubUrl,
+          targetUrl,
+          testEmail,
+          testPassword,
+          testPreferences,
+          numTests,
+          mode,
+          commitSha,
+          commitMessage,
+          pat,
         });
         setJobId(res.job_id);
       } catch (err: unknown) {
