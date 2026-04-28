@@ -173,6 +173,7 @@ export interface CommitInfo {
 
 export interface RepoAnalysisResult {
   analysis_id: string;
+  target_url: string;
   summary: string;
   tech_stack: string;
   pages: PageInfo[];
@@ -646,6 +647,11 @@ export interface WorkspacePlaywrightTest {
   steps: WorkspaceTestStep[];
 }
 
+export interface FileTestGroup {
+  filePath: string;
+  tests: WorkspacePlaywrightTest[];
+}
+
 export interface PlaywrightGenerateRequest {
   workspace_id: string;
   file_path: string;
@@ -744,9 +750,87 @@ export interface TestSuiteFull extends TestSuiteInfo {
   tests: WorkspacePlaywrightTest[];
 }
 
+// ─── Repo Baseline Types ───────────────────────────────────────────────────
+
+export type BaselineTestCategory =
+  | "auth"
+  | "api"
+  | "ui_form"
+  | "ui_navigation"
+  | "ui_component"
+  | "crud"
+  | "integration"
+  | "edge_case"
+  | "performance"
+  | "accessibility";
+
+export interface BaselineTestStep {
+  action: string;
+  target: string;
+  value: string | null;
+  assertion: string | null;
+}
+
+export interface BaselineTest {
+  test_id: string;
+  name: string;
+  description: string;
+  category: BaselineTestCategory;
+  page_path: string | null;
+  component_name: string | null;
+  endpoint: string | null;
+  severity: "critical" | "high" | "medium" | "low";
+  source_file: string | null;
+  steps: BaselineTestStep[];
+  playwright_code: string;
+  added_in_session: string;
+  created_at: string;
+  is_active: boolean;
+}
+
+export interface BaselineScanSession {
+  session_id: string;
+  scan_type: "full" | "incremental";
+  changed_files: string[];
+  tests_added: number;
+  tests_total_after: number;
+  commit_sha: string;
+  triggered_at: string;
+  status: "pending" | "running" | "done" | "failed";
+  error: string | null;
+  progress_message: string;
+}
+
+export interface BaselineScanResponse {
+  session_id: string;
+  repo_id: string;
+  scan_type: "full" | "incremental";
+  status: string;
+}
+
+export interface BaselineSessionStatus {
+  session_id: string;
+  scan_type: "full" | "incremental";
+  status: "pending" | "running" | "done" | "failed";
+  progress_message: string;
+  tests_added: number;
+  tests_total_after: number;
+  error: string | null;
+}
+
+export interface BaselineRepoData {
+  repo_id: string;
+  github_url: string;
+  total_tests: number;
+  sessions: BaselineScanSession[];
+  tests: BaselineTest[];
+  new_test_ids: string[];
+}
+
 // ─── API Functions ─────────────────────────────────────────────────────────
 
 export const api = {
+
   // Requirements
   analyzeRequirement: (text: string, instructions?: string) =>
     apiClient.post<AnalyzeRequirementResult>("/requirements", { text, instructions }).then((r) => r.data),
@@ -1133,6 +1217,15 @@ export const api = {
     apiClient
       .get<DeploymentEventsResponse>(`/deployments/${deploymentId}/events`, { params: { limit } })
       .then((r) => r.data),
+
+  /** Normalise a GitHub URL into a 16-char repo_id matching backend logic. */
+  getRepoId: async (url: string) => {
+    const normalised = url.toLowerCase().trim().replace(/\/$/, "").replace(".git", "");
+    const msgBuffer = new TextEncoder().encode(normalised);
+    const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  },
 };
 
 // ─── Code Impact + Test Intelligence Types ────────────────────────────────────
@@ -1350,3 +1443,43 @@ export interface PRDGenerateResponse {
   sections: PRDSection;
   created_at: string;
 }
+
+// ─── Repo Baseline API ─────────────────────────────────────────────────────
+
+export const baselineApi = {
+  /** Start a scan. First submission → full scan. Subsequent → incremental. */
+  scan: (github_url: string, github_token?: string) =>
+    apiClient
+      .post<BaselineScanResponse>("/baseline/scan", { github_url, github_token })
+      .then((r) => r.data),
+
+  /** Poll this every 3s until status === 'done' | 'failed'. */
+  getStatus: (session_id: string) =>
+    apiClient
+      .get<BaselineSessionStatus>(`/baseline/status/${session_id}`)
+      .then((r) => r.data),
+
+  /** Fetch all tests + sessions for a repo. Pass session_id to highlight new tests. */
+  getRepoTests: (repo_id: string, session_id?: string) =>
+    apiClient
+      .get<BaselineRepoData>(`/baseline/${repo_id}`, {
+        params: session_id ? { session_id } : {},
+      })
+      .then((r) => r.data),
+
+  /** Push ad-hoc generated tests from Workspace or Live Runner into the baseline. */
+  syncTests: (repo_id: string, tests: BaselineTest[], source: "workspace" | "live_runner") =>
+    apiClient
+      .post<{ status: string; added_count: number }>("/baseline/sync", { repo_id, tests, source })
+      .then((r) => r.data),
+
+  /** Normalise a GitHub URL into a 16-char repo_id matching backend logic. */
+  getRepoId: async (url: string) => {
+    const normalised = url.toLowerCase().trim().replace(/\/$/, "").replace(".git", "");
+    const msgBuffer = new TextEncoder().encode(normalised);
+    const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  },
+};
+

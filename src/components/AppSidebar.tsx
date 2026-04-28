@@ -17,6 +17,7 @@ import {
   Rocket,
   ClipboardList,
   Wand2,
+  Sparkles,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -37,6 +38,7 @@ const pipelineItem = { title: "SDLC Pipeline", url: "/pipeline", icon: Workflow,
 
 const sdlcTools = [
   { title: "AI App Builder", url: "/ai-ide", icon: Wand2, hint: "Type an idea → AI generates a full React app live" },
+  { title: "Repo Test Baseline", url: "/repo-baseline", icon: Sparkles, hint: "AI-categorised Playwright tests, incremental re-scan" },
   { title: "AI Workspace", url: "/workspace", icon: Code2, hint: "Code editor + AI Copilot + Git" },
   { title: "Code Reviewer", url: "/code-review", icon: GitPullRequest, hint: "AI inline PR review" },
   { title: "Code Impact", url: "/code-impact", icon: Network, hint: "Root→Leaf dependency graph + test gen" },

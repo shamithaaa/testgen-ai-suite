@@ -18,10 +18,12 @@ import {
   GitCommit,
   ExternalLink,
   FlaskConical,
+  Sparkles,
+  Layers,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { api, type CommitImpactTreeNode, type FileNode, type WorkspacePlaywrightTest, type DeploymentLogEvent, type DeploymentStatusResponse } from "@/lib/api";
+import { api, baselineApi, type CommitImpactTreeNode, type FileNode, type WorkspacePlaywrightTest, type DeploymentLogEvent, type DeploymentStatusResponse, type BaselineTest } from "@/lib/api";
 import { useWorkspaceContext } from "@/context/WorkspaceContext";
 import { useCommitImpactTree } from "@/hooks/use-commit-impact";
 import { useWorkspaceTree } from "@/hooks/use-workspace";
@@ -65,7 +67,7 @@ interface RunTestWizardProps {
 
 function RunTestWizard({ open, onClose, workspaceId, repoUrl, branch, selectedFilePath }: RunTestWizardProps) {
   const navigate = useNavigate();
-  const { openTabs } = useWorkspaceContext();
+  const { openTabs, setFileTests } = useWorkspaceContext();
   const gitStatusQuery = useGitStatus(workspaceId);
 
   const [activeStep, setActiveStep] = useState<WizardStep>("Generate");
@@ -80,6 +82,8 @@ function RunTestWizard({ open, onClose, workspaceId, repoUrl, branch, selectedFi
   const [commitMsg, setCommitMsg] = useState(`chore: auto-commit before test run [${new Date().toISOString().slice(0, 10)}]`);
   const [isCommitting, setIsCommitting] = useState(false);
   const [commitSha, setCommitSha] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncDone, setSyncDone] = useState(false);
 
   // Deploy state
   const [deploymentId, setDeploymentId] = useState<string | null>(null);
@@ -131,13 +135,48 @@ function RunTestWizard({ open, onClose, workspaceId, repoUrl, branch, selectedFi
         tests = result.tests;
       }
       setGeneratedTests(tests);
+      setFileTests(tests.length > 0 ? [{ filePath: selectedFilePath || "app", tests }] : null);
       setStepDone((prev) => ({ ...prev, Generate: true }));
-      setActiveStep("Commit");
+      // Automatically attempt to find repo_id if we have repoUrl
+      // but we wait for user to click "Sync" to promote to baseline
     } catch (err: any) {
       const msg = err?.response?.data?.detail || "Test generation failed.";
       setStepError((prev) => ({ ...prev, Generate: msg }));
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleSyncToBaseline = async () => {
+    if (!generatedTests.length) return;
+    setIsSyncing(true);
+    try {
+      const repoId = await api.getRepoId(repoUrl); // helper to get hash
+      const baselineMapped: BaselineTest[] = generatedTests.map(t => ({
+        test_id: `IDE-${t.id.slice(0, 6)}`,
+        name: t.name,
+        description: t.description,
+        category: "ui_component", // default for IDE
+        severity: t.severity.toLowerCase(),
+        page_path: t.page_name,
+        playwright_code: "", // Ide tests use steps usually, or we can fetch code if available
+        steps: t.steps.map(s => ({
+          action: s.action,
+          target: s.selector || "",
+          value: s.value || undefined,
+          assertion: s.description
+        })),
+        is_active: true,
+        created_at: new Date().toISOString()
+      } as any));
+
+      const res = await baselineApi.syncTests(repoId, baselineMapped, "workspace");
+      toast.success(`Synced ${res.added_count} tests to Global Baseline!`);
+      setSyncDone(true);
+    } catch (err: any) {
+      toast.error("Failed to sync to baseline: " + (err?.response?.data?.detail || err.message));
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -334,10 +373,21 @@ function RunTestWizard({ open, onClose, workspaceId, repoUrl, branch, selectedFi
                   {stepError.Generate}
                 </div>
               )}
-              <Button onClick={handleGenerate} disabled={isGenerating} className="gap-2">
-                {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-                {isGenerating ? "Generating…" : "Generate Test Cases"}
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleGenerate} disabled={isGenerating} className="gap-2 flex-1">
+                  {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
+                  {isGenerating ? "Generating…" : generatedTests.length > 0 ? "Regenerate" : "Generate Test Cases"}
+                </Button>
+                {generatedTests.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveStep("Commit")}
+                    className="gap-2 flex-1 border-primary/30 text-primary hover:bg-primary/5"
+                  >
+                    Next: Commit <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
@@ -479,6 +529,36 @@ function RunTestWizard({ open, onClose, workspaceId, repoUrl, branch, selectedFi
             </div>
           )}
         </div>
+
+        {/* ── Global Footer Actions (Always visible if tests exist) ── */}
+        {generatedTests.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-border/30 px-1">
+            <div className="p-3 rounded-xl border border-primary/20 bg-primary/5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-primary">Promote to Global Baseline</p>
+                  <p className="text-[10px] text-muted-foreground">Permanent change-tracking for this repo.</p>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                variant="ghost"
+                onClick={handleSyncToBaseline}
+                disabled={isSyncing || syncDone}
+                className={cn(
+                  "h-8 text-[11px] gap-2 border border-primary/20",
+                  syncDone ? "bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/20 hover:text-green-300" : "text-primary hover:bg-primary/10"
+                )}
+              >
+                {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : syncDone ? <CheckCircle2 className="h-3 w-3" /> : <Layers className="h-3 w-3" />}
+                {syncDone ? "Synced!" : "Sync Now"}
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -628,7 +708,7 @@ function FileTreeNodeRow({
 
 
 export function ViewEntryTree({ refreshNonce = 0 }: { refreshNonce?: number } = {}) {
-  const { workspace, activeTab, openFile } = useWorkspaceContext();
+  const { workspace, activeTab, openFile, setFileTests } = useWorkspaceContext();
   const impactQuery = useCommitImpactTree(workspace?.workspace_id ?? null, 5);
   const workspaceTreeQuery = useWorkspaceTree(workspace?.workspace_id ?? null);
   const gitStatusQuery = useGitStatus(workspace?.workspace_id ?? null);

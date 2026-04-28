@@ -39,6 +39,11 @@ import {
   Upload,
   FileCode,
   FlaskConical,
+  Sparkles,
+  Search,
+  Check,
+  Filter,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,11 +60,19 @@ import {
 } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { UnifiedTestIntelligence } from "@/components/pipeline/UnifiedTestIntelligence";
 import { useLiveTesting, useFetchCommits, useRunHistory, LiveTestingPhase } from "../hooks/use-live-testing";
 import { usePipelineContext } from "@/context/PipelineContext";
-import { PlaywrightTestCase, TestStep, LiveTestResult, StepResult, CommitInfo, RunSummaryItem, RepoAnalysisResult } from "../lib/api";
+import { api, baselineApi, PlaywrightTestCase, TestStep, LiveTestResult, StepResult, CommitInfo, RunSummaryItem, RepoAnalysisResult, BaselineTest, WorkspacePlaywrightTest } from "../lib/api";
 import { downloadLiveTestReport, downloadRunSummaryReport } from "../lib/pdf-report";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 // ── Severity badge colours ────────────────────────────────────────────────────
 
@@ -138,13 +151,12 @@ function ScreenshotViewer({
           <button
             key={i}
             onClick={() => setIdx(i)}
-            className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded border transition-colors ${
-              i === idx
+            className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded border transition-colors ${i === idx
                 ? "bg-primary/20 border-primary/50 text-primary"
                 : s.status === "fail"
-                ? "bg-red-500/10 border-red-500/30 text-red-400"
-                : "bg-muted border-border/50 text-muted-foreground hover:bg-muted/80"
-            }`}
+                  ? "bg-red-500/10 border-red-500/30 text-red-400"
+                  : "bg-muted border-border/50 text-muted-foreground hover:bg-muted/80"
+              }`}
           >
             Step {i + 1}
           </button>
@@ -229,11 +241,10 @@ function LiveTestCard({ result }: { result: LiveTestResult }) {
                 return (
                   <div
                     key={i}
-                    className={`flex items-start gap-2 text-xs rounded p-1.5 ${
-                      sr.status === "fail"
+                    className={`flex items-start gap-2 text-xs rounded p-1.5 ${sr.status === "fail"
                         ? "bg-red-500/10 border border-red-500/20"
                         : "bg-muted/30"
-                    }`}
+                      }`}
                   >
                     {sr.status === "pass" ? (
                       <CheckCircle2 className="h-3 w-3 text-green-400 mt-0.5 flex-shrink-0" />
@@ -658,13 +669,12 @@ function UploadSpecPanel({
 
           {/* Drop zone */}
           <div
-            className={`relative rounded-xl border-2 border-dashed transition-colors cursor-pointer ${
-              dragOver
+            className={`relative rounded-xl border-2 border-dashed transition-colors cursor-pointer ${dragOver
                 ? "border-primary bg-primary/5"
                 : selectedFile
-                ? "border-green-500/50 bg-green-500/5"
-                : "border-border/50 hover:border-primary/40 hover:bg-muted/20"
-            }`}
+                  ? "border-green-500/50 bg-green-500/5"
+                  : "border-border/50 hover:border-primary/40 hover:bg-muted/20"
+              }`}
             onClick={() => fileRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
@@ -1038,11 +1048,10 @@ function InputPhase({
                         type="button"
                         disabled={isAnalyzing}
                         onClick={() => toggleChip(label)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border transition-colors ${
-                          selectedChips.has(label)
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border transition-colors ${selectedChips.has(label)
                             ? "bg-primary/20 border-primary/50 text-primary"
                             : "bg-muted/40 border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                        }`}
+                          }`}
                       >
                         <Icon className="h-3 w-3" />
                         {label}
@@ -1136,17 +1145,15 @@ function InputPhase({
                         setTestingScope(scope);
                         setSelectedCommit(null);
                       }}
-                      className={`flex items-start gap-3 px-3 py-3 rounded-lg border text-left transition-colors ${
-                        testingScope === scope
+                      className={`flex items-start gap-3 px-3 py-3 rounded-lg border text-left transition-colors ${testingScope === scope
                           ? "bg-primary/15 border-primary/50"
                           : "bg-muted/30 border-border/40 hover:border-primary/30"
-                      }`}
+                        }`}
                     >
-                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center border flex-shrink-0 ${
-                        testingScope === scope
+                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center border flex-shrink-0 ${testingScope === scope
                           ? "bg-primary/10 border-primary/25 text-primary"
                           : "bg-background/40 border-border/50 text-muted-foreground"
-                      }`}>
+                        }`}>
                         {scope === "full" ? <Workflow className="h-4 w-4" /> : <GitCommit className="h-4 w-4" />}
                       </div>
                       <div className="min-w-0">
@@ -1201,11 +1208,10 @@ function InputPhase({
                               type="button"
                               disabled={isAnalyzing}
                               onClick={() => setSelectedCommit(c)}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-border/20 last:border-b-0 ${
-                                selectedCommit?.sha === c.sha
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-border/20 last:border-b-0 ${selectedCommit?.sha === c.sha
                                   ? "bg-primary/10 border-l-2 border-l-primary"
                                   : "hover:bg-muted/30"
-                              }`}
+                                }`}
                             >
                               <div className="h-6 w-6 rounded-full bg-primary/15 border border-primary/25 flex items-center justify-center text-[10px] font-bold text-primary flex-shrink-0">
                                 {c.author.charAt(0).toUpperCase()}
@@ -1332,9 +1338,9 @@ function InputPhase({
 // ── Step progress indicator ───────────────────────────────────────────────────
 
 const STEPS = [
-  { key: "cloning",    label: "Cloning repository" },
+  { key: "cloning", label: "Cloning repository" },
   { key: "extracting", label: "Extracting source files" },
-  { key: "analyzing",  label: "AI analysing codebase" },
+  { key: "analyzing", label: "AI analysing codebase" },
   { key: "generating", label: "Generating Playwright tests" },
 ];
 
@@ -1390,11 +1396,10 @@ function AnalyzingPhase({
           const done = i < currentIdx || currentStep === "completed";
           const active = i === currentIdx;
           return (
-            <div key={s.key} className={`flex items-center gap-3 text-sm rounded-lg p-2.5 border transition-colors ${
-              done ? "border-green-500/30 bg-green-500/5" :
-              active ? "border-primary/40 bg-primary/5" :
-              "border-border/30 bg-transparent text-muted-foreground"
-            }`}>
+            <div key={s.key} className={`flex items-center gap-3 text-sm rounded-lg p-2.5 border transition-colors ${done ? "border-green-500/30 bg-green-500/5" :
+                active ? "border-primary/40 bg-primary/5" :
+                  "border-border/30 bg-transparent text-muted-foreground"
+              }`}>
               {done ? (
                 <CheckCircle2 className="h-4 w-4 text-green-400 flex-shrink-0" />
               ) : active ? (
@@ -1449,188 +1454,157 @@ function ReadyPhase({
   errorMsg,
   specTargetUrl,
   onSpecTargetUrlChange,
+  baselineTests = [],
+  selectedBaselineIds = new Set(),
+  onBaselineToggle,
 }: {
   analysis: NonNullable<ReturnType<typeof useLiveTesting>["analysis"]>;
   editedTests: PlaywrightTestCase[] | null;
-  onExecute: () => void;
+  onExecute: (combinedTests?: PlaywrightTestCase[]) => void;
   onReset: () => void;
   onSave: (id: string, updates: Partial<PlaywrightTestCase>) => Promise<void>;
   isExecuting: boolean;
   errorMsg: string | null;
   specTargetUrl?: string | null;
   onSpecTargetUrlChange?: (url: string) => void;
+  baselineTests?: BaselineTest[];
+  selectedBaselineIds?: Set<string>;
+  onBaselineToggle?: (checked: boolean) => void;
 }) {
   const tests = editedTests ?? analysis.tests;
   const isSpecUpload = analysis.analysis_id.startsWith("spec-");
 
+  // Map PlaywrightTestCase to WorkspacePlaywrightTest for UnifiedTestIntelligence
+  const sessionMapped: WorkspacePlaywrightTest[] = tests.map(t => ({
+    id: t.id,
+    analysis_id: analysis.analysis_id,
+    name: t.name,
+    description: t.description,
+    page_name: t.page_name,
+    severity: t.severity,
+    steps: t.steps,
+    source: isSpecUpload ? "baseline" : "session"
+  } as any));
+
+  const baselineMapped: WorkspacePlaywrightTest[] = baselineTests
+    .filter(bt => selectedBaselineIds.has(bt.test_id))
+    .map(bt => ({
+      id: bt.test_id,
+      analysis_id: "baseline",
+      name: bt.name,
+      description: bt.description,
+      page_name: bt.page_path || "/",
+      severity: bt.severity,
+      steps: bt.steps.map(s => ({
+        action: s.action,
+        selector: s.target,
+        value: s.value,
+        description: s.assertion || ""
+      })),
+      source: "baseline"
+    } as any));
+
+  const mappedTests = [...sessionMapped, ...baselineMapped];
+
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-      {/* Summary strip */}
-      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium leading-snug">{analysis.summary}</p>
-            <div className="flex items-center gap-2 mt-1.5">
-              <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">{analysis.tech_stack}</span>
-            </div>
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+      {/* Premium Header Strip */}
+      <div className="flex items-center justify-between bg-card/40 border border-border/40 p-6 rounded-[2.5rem] backdrop-blur-md shadow-xl">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+             <div className="p-3 rounded-2xl bg-orange-500/10 border border-orange-500/20 shadow-inner">
+               <Sparkles className="h-6 w-6 text-orange-400" />
+             </div>
+             <div>
+               <p className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground/60 mb-0.5">Intelligence Status</p>
+               <h4 className="text-lg font-black uppercase tracking-tight">Active Growth Stream</h4>
+             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Badge variant="outline" className="text-xs">
-              {analysis.pages.length} pages
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {tests.length} tests
-            </Badge>
+          <div className="h-10 w-px bg-border/20" />
+          <div className="flex flex-col">
+             <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest mb-1">Stack Discovery</span>
+             <Badge variant="outline" className="text-[10px] font-bold border-primary/20 bg-primary/5 px-2.5 py-1 rounded-lg">
+                {analysis.tech_stack}
+             </Badge>
           </div>
+
+          {baselineTests.length > 0 && (
+            <>
+              <div className="h-10 w-px bg-border/20" />
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col">
+                  <Label htmlFor="baseline-toggle-ltr" className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 mb-1.5 cursor-pointer">
+                    Integrate Baseline
+                  </Label>
+                  <div className="flex items-center gap-3">
+                    <Switch 
+                      id="baseline-toggle-ltr" 
+                      checked={selectedBaselineIds.size > 0}
+                      onCheckedChange={onBaselineToggle}
+                    />
+                    <span className="text-[10px] font-bold text-muted-foreground/40">{selectedBaselineIds.size} Units</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-4">
+          <Button variant="outline" className="h-12 px-6 rounded-2xl border-border/40 hover:bg-muted/20 font-black uppercase tracking-widest text-[10px]" onClick={onReset} disabled={isExecuting}>
+            New Session
+          </Button>
+          <Button className="h-12 px-10 rounded-2xl shadow-xl shadow-orange-500/20 bg-orange-500 hover:bg-orange-600 text-white font-black uppercase tracking-widest text-[10px]" onClick={() => onExecute(mappedTests as any)} disabled={isExecuting || (isSpecUpload && !specTargetUrl?.trim().startsWith("http"))}>
+            {isExecuting ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <Play className="h-4 w-4 mr-3 fill-current" />}
+            Trigger Growth
+          </Button>
         </div>
       </div>
 
-      {/* Two column: pages + flows — only shown for full AI analysis */}
-      {analysis.pages.length > 0 && analysis.user_flows.length > 0 && !analysis.analysis_id.startsWith("spec-") && (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Pages */}
-        <Card className="border-border/50">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Layers className="h-4 w-4 text-primary" /> Pages Found
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-2">
-            {analysis.pages.map((page) => (
-              <div key={page.path} className="rounded-lg bg-muted/30 p-2.5 space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">{page.name}</span>
-                  <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                    {page.path}
-                  </code>
-                </div>
-                <p className="text-[11px] text-muted-foreground">{page.description}</p>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {page.key_elements.slice(0, 4).map((el) => (
-                    <span
-                      key={el}
-                      className="text-[10px] bg-background border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground"
-                    >
-                      {el}
-                    </span>
-                  ))}
-                  {page.key_elements.length > 4 && (
-                    <span className="text-[10px] text-muted-foreground">
-                      +{page.key_elements.length - 4} more
-                    </span>
-                  )}
-                </div>
+      {analysis.summary && (
+        <div className="rounded-3xl border border-border/30 bg-muted/5 p-6 backdrop-blur-sm">
+           <div className="flex items-start gap-4">
+              <div className="p-2 rounded-xl bg-primary/10 mt-1">
+                 <Info className="h-4 w-4 text-primary" />
               </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* User Flows */}
-        <Card className="border-border/50">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Workflow className="h-4 w-4 text-primary" /> User Flows Identified
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-2">
-            {analysis.user_flows.map((flow) => (
-              <div key={flow.name} className="rounded-lg bg-muted/30 p-2.5 space-y-1.5">
-                <p className="text-sm font-medium">{flow.name}</p>
-                <ol className="space-y-0.5">
-                  {flow.steps.map((step, i) => (
-                    <li key={i} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
-                      <span className="text-primary/70 font-mono flex-shrink-0">{i + 1}.</span>
-                      <span>{step}</span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+              <p className="text-sm font-medium leading-relaxed text-foreground/80">{analysis.summary}</p>
+           </div>
+        </div>
       )}
 
-      {/* Generated test suite — editable */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            {analysis.analysis_id.startsWith("spec-") ? "Imported Test Suite" : "Generated Test Suite"} ({tests.length})
-          </h2>
-          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-            <Pencil className="h-3 w-3" /> Click the pencil icon to edit any test
-          </span>
+      {/* Unified Intelligence List */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-4">
+           <h2 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">Execution Plan Orchestration</h2>
+           <span className="text-[10px] font-bold text-muted-foreground/50">{tests.length} Units Ready</span>
         </div>
-        {tests.map((t) => (
-          <TestCaseEditor key={t.id} test={t} onSave={onSave} />
-        ))}
+        <UnifiedTestIntelligence tests={mappedTests} />
       </div>
 
-      {/* Error — show connection-refused help prominently */}
       {errorMsg && (
-        <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0" />
-            <p className="text-sm font-semibold text-red-400">Cannot run tests</p>
+        <div className="rounded-3xl bg-red-500/10 border border-red-500/20 p-6 space-y-3">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <p className="text-sm font-black uppercase tracking-widest text-red-400">Signal Interruption</p>
           </div>
-          <p className="text-xs text-red-300 leading-relaxed">{errorMsg}</p>
-          {errorMsg.toLowerCase().includes("not reachable") || errorMsg.toLowerCase().includes("connection refused") ? (
-            <div className="mt-2 rounded bg-black/30 border border-red-500/20 p-3 space-y-1">
-              <p className="text-[11px] text-yellow-400 font-semibold">How to fix:</p>
-              <p className="text-[11px] text-muted-foreground">
-                1. Make sure your app is running locally (e.g. <code className="text-yellow-300">npm run dev</code>).
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                2. Check the correct port — Vite default is <code className="text-yellow-300">5173</code>,
-                   not 8083. Try <code className="text-yellow-300">http://localhost:5173</code>.
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                3. The Playwright browser runs <strong>inside the backend server</strong>, so the URL
-                   must be accessible from the same machine.
-              </p>
-            </div>
-          ) : null}
+          <p className="text-xs text-red-300 font-medium leading-relaxed ml-8">{errorMsg}</p>
         </div>
       )}
 
-      {/* Target URL field for spec uploads */}
       {isSpecUpload && (
-        <div className="rounded-xl border border-border/50 bg-card/40 p-4 space-y-2">
-          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Globe className="h-3.5 w-3.5" /> Target App URL
+        <div className="rounded-[2rem] border border-border/50 bg-card/40 p-8 space-y-4 shadow-inner">
+          <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1">
+            <Globe className="h-3.5 w-3.5 inline mr-2" /> Target Application Bridge
           </label>
           <Input
-            placeholder="https://your-app.vercel.app"
+            placeholder="https://your-production-app.app"
             value={specTargetUrl ?? ""}
             onChange={(e) => onSpecTargetUrlChange?.(e.target.value)}
             disabled={isExecuting}
-            className="h-9"
+            className="h-12 bg-background/50 border-border/30 rounded-2xl font-medium px-5"
           />
-          <p className="text-[11px] text-muted-foreground">The app must be running and accessible from this server.</p>
         </div>
       )}
-
-      {/* Actions */}
-      <div className="flex gap-3">
-        <Button className="flex-1" size="lg" onClick={onExecute} disabled={isExecuting || (isSpecUpload && !specTargetUrl?.trim().startsWith("http"))}>
-          {isExecuting ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Starting execution…
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4 mr-2" />
-              Run Tests Live
-            </>
-          )}
-        </Button>
-        <Button variant="outline" onClick={onReset} disabled={isExecuting}>
-          <RotateCcw className="h-4 w-4 mr-2" />
-          {isSpecUpload ? "Upload New File" : "New Repo"}
-        </Button>
-      </div>
     </motion.div>
   );
 }
@@ -1650,176 +1624,175 @@ function ExecutionPhase({
 }) {
   if (!runStatus) {
     return (
-      <div className="flex flex-col items-center py-20 gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Waiting for execution to start…</p>
+      <div className="flex flex-col items-center py-24 gap-4 animate-pulse">
+        <div className="p-4 rounded-3xl bg-primary/10 border border-primary/20">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+        <p className="text-sm font-black text-muted-foreground uppercase tracking-widest">Initialising Observer Stream...</p>
       </div>
     );
   }
 
   const { results, total, passed, failed, status } = runStatus;
-  const completed = results.filter((r) => r.status === "passed" || r.status === "failed").length;
-  const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-  const successRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+  const completedCount = results.filter((r) => r.status === "passed" || r.status === "failed").length;
+  const progressPercent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+  const successRatePercent = total > 0 ? Math.round((passed / total) * 100) : 0;
 
-  // Find the currently running test (last step screenshot = live view)
   const runningTest = results.find((r) => r.status === "running");
-  const lastTest = results[results.length - 1];
-  const activeTest = runningTest ?? lastTest;
-
-  // Get the latest screenshot from the active test
-  const latestScreenshot = activeTest?.step_results
-    .slice()
-    .reverse()
-    .find((s) => s.screenshot)?.screenshot ?? null;
-
-  // Get the step currently executing
-  const currentStepDesc = runningTest
-    ? runningTest.step_results[runningTest.step_results.length - 1]?.step_description
-      ?? `Running step ${runningTest.steps_completed + 1} of ${runningTest.total_steps}…`
-    : null;
+  const latestFrame = runningTest?.step_results.slice().reverse().find((s) => s.screenshot)?.screenshot ?? null;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-      {/* ── Live Browser Preview ──────────────────────────────────────────── */}
-      <div className="rounded-xl border border-border/50 bg-black overflow-hidden">
-        {/* Browser chrome bar */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border-b border-border/30">
-          <div className="flex gap-1.5">
-            <div className="h-3 w-3 rounded-full bg-red-500/70" />
-            <div className="h-3 w-3 rounded-full bg-yellow-500/70" />
-            <div className="h-3 w-3 rounded-full bg-green-500/70" />
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+      {/* Simulation Monitor */}
+      <div className="rounded-[3rem] border border-border/50 bg-black overflow-hidden shadow-[0_30px_90px_rgba(0,0,0,0.5)]">
+        <div className="flex items-center gap-3 px-6 py-4 bg-zinc-900 border-b border-border/30">
+          <div className="flex gap-2">
+            <div className="h-3 w-3 rounded-full bg-red-500/70 shadow-[0_0_10px_rgba(239,68,68,0.4)]" />
+            <div className="h-3 w-3 rounded-full bg-yellow-500/70 shadow-[0_0_10px_rgba(234,179,8,0.4)]" />
+            <div className="h-3 w-3 rounded-full bg-green-500/70 shadow-[0_0_10px_rgba(34,197,94,0.4)]" />
           </div>
-          <div className="flex-1 mx-2 bg-zinc-800 rounded px-2 py-0.5 text-[11px] text-muted-foreground font-mono truncate">
-            {activeTest ? `Running: ${activeTest.test_name}` : "Playwright Browser"}
+          <div className="flex-1 mx-4 bg-zinc-800/50 rounded-xl px-4 py-1.5 text-[11px] text-muted-foreground font-mono truncate border border-zinc-700/50">
+            {runningTest ? `Active Trace: ${runningTest.test_name}` : "Playwright Execution Bridge"}
           </div>
           {status === "running" && (
-            <div className="flex items-center gap-1.5 text-[11px] text-yellow-400">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span>Live</span>
+            <div className="flex items-center gap-2.5 text-[10px] text-yellow-400 font-black bg-yellow-400/10 px-3 py-1 rounded-full border border-yellow-400/20 tracking-widest uppercase">
+              <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
+              Live Stream
             </div>
-          )}
-          {status === "completed" && (
-            <span className="text-[11px] text-green-400">Done</span>
           )}
         </div>
+        <div className="relative aspect-video bg-zinc-950 flex items-center justify-center min-h-[400px]">
+          <AnimatePresence mode="wait">
+            {latestFrame ? (
+              <motion.img
+                key={latestFrame.slice(-20)}
+                initial={{ opacity: 0, scale: 1.05 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                src={`data:image/png;base64,${latestFrame}`}
+                alt="Live browser feed"
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-4 text-muted-foreground text-center max-w-xs">
+                <div className="p-5 rounded-full bg-muted/10 border border-border/20 mb-2">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary/40" />
+                </div>
+                <p className="text-sm font-black uppercase tracking-widest opacity-60">Wait for visual synchronisation...</p>
+              </div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
 
-        {/* Screenshot viewport */}
-        <div className="relative aspect-video bg-zinc-950 flex items-center justify-center min-h-[280px]">
-          {latestScreenshot ? (
-            <motion.img
-              key={latestScreenshot.slice(-20)} // key changes → fade transition
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.2 }}
-              src={`data:image/png;base64,${latestScreenshot}`}
-              alt="Live browser view"
-              className="w-full h-full object-contain"
-            />
-          ) : (
-            <div className="flex flex-col items-center gap-3 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <p className="text-sm">Waiting for first screenshot…</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+         <div className="lg:col-span-2 rounded-[2.5rem] border border-border/40 bg-card/60 backdrop-blur-md p-8 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center justify-between mb-8 relative">
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  "p-3 rounded-2xl border transition-all duration-500",
+                  status === "running" ? "bg-yellow-500/10 border-yellow-500/30 animate-pulse" : "bg-green-500/10 border-green-500/30"
+                )}>
+                  {status === "running" ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-yellow-400" />
+                  ) : (
+                    <CheckCircle2 className="h-6 w-6 text-green-400" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground/60 mb-0.5">Execution Metrics</p>
+                  <p className="text-lg font-black uppercase tracking-tight">
+                    {status === "running" ? `Processing Unit ${completedCount + 1} of ${total}` : "Validation Protocols Concluded"}
+                  </p>
+                </div>
+              </div>
+              {phase === "done" && (
+                <div className="flex items-center gap-3">
+                  <Button 
+                    variant="outline" 
+                    className="h-12 px-6 rounded-2xl border-border/40 bg-background/50 hover:bg-background font-black uppercase tracking-widest text-[10px] shadow-sm transform hover:scale-105 transition-all"
+                    onClick={() => downloadLiveTestReport(runStatus!, analysis)}
+                  >
+                    <Download className="h-4 w-4 mr-2.5 text-primary" /> Analysis Pack
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    className="h-12 w-12 rounded-2xl border border-border/20 hover:bg-muted/40 transition-all p-0"
+                    onClick={onReset}
+                  >
+                    <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Current step overlay */}
-          {currentStepDesc && status === "running" && (
-            <div className="absolute bottom-0 left-0 right-0 bg-black/70 backdrop-blur-sm px-3 py-2">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary flex-shrink-0" />
-                <p className="text-[12px] text-white truncate">{currentStepDesc}</p>
-                {runningTest && (
-                  <span className="ml-auto text-[11px] text-muted-foreground flex-shrink-0">
-                    step {runningTest.steps_completed}/{runningTest.total_steps}
-                  </span>
-                )}
+            <div className="space-y-4 mb-8">
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <span>Coverage Depth</span>
+                <span className="text-primary font-bold">{progressPercent}%</span>
+              </div>
+              <Progress value={progressPercent} className="h-3 rounded-full bg-muted/30 shadow-inner" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Validated", value: passed, icon: CheckCircle2, color: "text-green-400", bg: "bg-green-400/5" },
+                { label: "Friction", value: failed, icon: AlertTriangle, color: "text-red-400", bg: "bg-red-400/5" },
+                { label: "Resolved", value: completedCount, icon: Play, color: "text-primary", bg: "bg-primary/5" },
+              ].map((stat) => (
+                <div key={stat.label} className={cn("p-5 rounded-3xl border border-border/20 backdrop-blur-sm transition-all hover:border-border/40", stat.bg)}>
+                  <div className="flex items-center justify-between mb-2">
+                    <stat.icon className={cn("h-4 w-4", stat.color)} />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">{stat.label}</span>
+                  </div>
+                  <p className="text-3xl font-black tabular-nums tracking-tighter">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+         </div>
+
+         <div className="rounded-[2.5rem] border border-border/40 bg-gradient-to-br from-orange-500/10 to-orange-500/5 p-8 flex flex-col justify-center items-center text-center backdrop-blur-md shadow-2xl relative overflow-hidden group">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(249,115,22,0.15),transparent)] opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
+            <div className="relative space-y-4">
+              <div className="p-5 rounded-full bg-background/50 border border-orange-500/20 shadow-2xl inline-block mb-2 transform group-hover:scale-110 transition-transform duration-700">
+                <Sparkles className="h-10 w-10 text-orange-500 animate-pulse" />
+              </div>
+              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-orange-500/70">{total} Active Units</p>
+              <div className="space-y-1">
+                <p className="text-6xl font-black tabular-nums tracking-tighter text-orange-500">
+                  {status === "running" ? Math.round(progressPercent) : successRatePercent}
+                  <span className="text-2xl ml-1 text-orange-500/60">%</span>
+                </p>
+                <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest">
+                  {status === "running" ? "Stream Progress" : "Accuracy Rating"}
+                </p>
               </div>
             </div>
-          )}
-        </div>
+         </div>
       </div>
 
-      {/* ── Stats bar ────────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            {status === "running" ? (
-              <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
-            ) : status === "completed" ? (
-              <CheckCircle2 className="h-4 w-4 text-green-400" />
-            ) : (
-              <XCircle className="h-4 w-4 text-red-400" />
-            )}
-            <span className="text-sm font-medium">
-              {status === "running" ? `Running test ${completed + 1} of ${total}…` : `Completed`}
-            </span>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+             <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+             <h2 className="text-[12px] font-black text-muted-foreground uppercase tracking-[0.25em]">Observation Log</h2>
           </div>
-          {phase === "done" && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => downloadLiveTestReport(runStatus!, analysis)}
-              >
-                <Download className="h-3.5 w-3.5 mr-1.5" /> Download Report
-              </Button>
-              <Button variant="outline" size="sm" onClick={onReset}>
-                <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> New Run
-              </Button>
-            </div>
-          )}
-        </div>
-
-        <Progress value={progress} className="h-1.5 mb-3" />
-
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div>
-            <p className="text-xl font-bold">{total}</p>
-            <p className="text-[11px] text-muted-foreground">Total</p>
-          </div>
-          <div>
-            <p className="text-xl font-bold text-green-400">{passed}</p>
-            <p className="text-[11px] text-muted-foreground">Passed</p>
-          </div>
-          <div>
-            <p className="text-xl font-bold text-red-400">{failed}</p>
-            <p className="text-[11px] text-muted-foreground">Failed</p>
+          <div className="flex items-center gap-8">
+             <div className="flex items-center gap-2 group">
+                <span className="text-[10px] font-black text-muted-foreground group-hover:text-green-400 transition-colors tracking-widest uppercase">Verified</span>
+                <span className="text-xl font-black tabular-nums text-green-400">{passed}</span>
+             </div>
+             <div className="flex items-center gap-2 group">
+                <span className="text-[10px] font-black text-muted-foreground group-hover:text-red-400 transition-colors tracking-widest uppercase">Friction</span>
+                <span className="text-xl font-black tabular-nums text-red-400">{failed}</span>
+             </div>
           </div>
         </div>
-
-        {phase === "done" && total > 0 && (
-          <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Success rate</span>
-            <span className={`font-bold ${successRate >= 80 ? "text-green-400" : successRate >= 50 ? "text-yellow-400" : "text-red-400"}`}>
-              {successRate}%
-            </span>
-          </div>
-        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {results.map((r) => <LiveTestCard key={r.test_id} result={r} />)}
+        </div>
       </div>
-
-      {/* ── Per-test results list ─────────────────────────────────────────── */}
-      <div className="space-y-2">
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Test Results
-        </h2>
-        {results.map((result) => (
-          <LiveTestCard key={result.test_id} result={result} />
-        ))}
-        {results.length === 0 && status === "running" && (
-          <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Starting first test…
-          </div>
-        )}
-      </div>
-
-      {runStatus.error && (
-        <div className="flex items-start gap-2 rounded bg-red-500/10 border border-red-500/20 p-3">
-          <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-red-400">{runStatus.error}</p>
-        </div>
-      )}
     </motion.div>
   );
 }
@@ -1842,11 +1815,10 @@ function RunDetailSheet({ run, open, onClose }: { run: RunSummaryItem | null; op
         <SheetHeader className="px-6 py-5 border-b border-border/50 bg-card/50">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className={`h-3 w-3 rounded-full flex-shrink-0 ${
-                run.status === "completed" ? "bg-green-400" :
-                run.status === "failed" ? "bg-red-400" :
-                "bg-yellow-400 animate-pulse"
-              }`} />
+              <div className={`h-3 w-3 rounded-full flex-shrink-0 ${run.status === "completed" ? "bg-green-400" :
+                  run.status === "failed" ? "bg-red-400" :
+                    "bg-yellow-400 animate-pulse"
+                }`} />
               <SheetTitle className="text-base font-semibold">Test Run Details</SheetTitle>
             </div>
             {run.status !== "running" && (
@@ -1929,13 +1901,12 @@ function RunDetailSheet({ run, open, onClose }: { run: RunSummaryItem | null; op
                   {run.results.map((r, i) => (
                     <div
                       key={i}
-                      className={`rounded-lg border p-3 flex items-center gap-3 ${
-                        r.status === "passed"
+                      className={`rounded-lg border p-3 flex items-center gap-3 ${r.status === "passed"
                           ? "border-green-500/25 bg-green-500/5"
                           : r.status === "failed"
-                          ? "border-red-500/25 bg-red-500/5"
-                          : "border-border/40 bg-card/30"
-                      }`}
+                            ? "border-red-500/25 bg-red-500/5"
+                            : "border-border/40 bg-card/30"
+                        }`}
                     >
                       {r.status === "passed" ? (
                         <CheckCircle2 className="h-4 w-4 text-green-400 flex-shrink-0" />
@@ -1953,10 +1924,9 @@ function RunDetailSheet({ run, open, onClose }: { run: RunSummaryItem | null; op
                         )}
                         <Badge
                           variant="outline"
-                          className={`text-[10px] h-5 px-1.5 capitalize ${
-                            r.status === "passed" ? "border-green-500/40 text-green-400 bg-green-500/10" :
-                            r.status === "failed" ? "border-red-500/40 text-red-400 bg-red-500/10" : ""
-                          }`}
+                          className={`text-[10px] h-5 px-1.5 capitalize ${r.status === "passed" ? "border-green-500/40 text-green-400 bg-green-500/10" :
+                              r.status === "failed" ? "border-red-500/40 text-red-400 bg-red-500/10" : ""
+                            }`}
                         >
                           {r.status}
                         </Badge>
@@ -2007,11 +1977,10 @@ function RunHistoryPanel() {
           return (
             <div key={run.run_id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors">
               {/* Status dot */}
-              <span className={`h-2 w-2 rounded-full flex-shrink-0 ${
-                run.status === "completed" ? "bg-green-400" :
-                run.status === "failed" ? "bg-red-400" :
-                "bg-yellow-400 animate-pulse"
-              }`} />
+              <span className={`h-2 w-2 rounded-full flex-shrink-0 ${run.status === "completed" ? "bg-green-400" :
+                  run.status === "failed" ? "bg-red-400" :
+                    "bg-yellow-400 animate-pulse"
+                }`} />
 
               {/* Commit-hash style run ID */}
               <code className="text-[10px] font-mono text-primary/70 bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded flex-shrink-0">
@@ -2116,6 +2085,7 @@ export default function LiveTestRunner({
     errorMsg,
     handleAnalyze,
     handleExecute,
+    handleExecuteDirect,
     handleUploadSpec,
     reset,
     specTargetUrl,
@@ -2123,10 +2093,32 @@ export default function LiveTestRunner({
     isStarting,
     isExecuting,
     isParsingSpec,
+    setPhase,
+    setAnalysis,
+    setEditedTests,
   } = useLiveTesting();
 
+  const activeTargetUrlRef = useRef<string>(effectiveAppUrl || "");
+
+  const [showSuiteSelector, setShowSuiteSelector] = useState(false);
+  const [suitePayload, setSuitePayload] = useState<any>(null);
+  const [baselineTests, setBaselineTests] = useState<BaselineTest[]>([]);
+  const [selectedBaselineIds, setSelectedBaselineIds] = useState<Set<string>>(new Set());
+  const [isLoadingBaseline, setIsLoadingBaseline] = useState(false);
+  const [baselineSearch, setBaselineSearch] = useState("");
+  const [activePageFilter, setActivePageFilter] = useState<string>("All");
+
   // Fire onRunComplete once when run transitions to done
-  const reportedRef = useCallback(() => {}, []);
+  const filteredBaselines = baselineTests.filter(bt => {
+    const matchSearch = bt.name.toLowerCase().includes(baselineSearch.toLowerCase()) ||
+      bt.description?.toLowerCase().includes(baselineSearch.toLowerCase());
+    const matchPage = activePageFilter === "All" || bt.page_path === activePageFilter;
+    return matchSearch && matchPage;
+  });
+
+  const uniquePages = Array.from(new Set(baselineTests.map(t => t.page_path || "/"))).sort();
+
+  const reportedRef = useCallback(() => { }, []);
   if (phase === "done" && runStatus && onRunComplete) {
     const t = runStatus.total ?? 0;
     const p = runStatus.passed ?? 0;
@@ -2140,54 +2132,373 @@ export default function LiveTestRunner({
   void reportedRef; // suppress unused warning
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <AnimatePresence mode="wait">
-        {phase === "idle" && (
-          <InputPhase
-            key="input"
-            onAnalyze={(g, t, e, p, prefs, numTests, mode, sha, msg, pat) => 
-               handleAnalyze(g, t, e, p, prefs, numTests, mode, sha, msg, pat || pipelinePat)
-            }
-            onUploadSpec={(file, targetUrl, email, password) => handleUploadSpec(file, targetUrl, email, password)}
-            isAnalyzing={isStarting}
-            isParsing={isParsingSpec}
-            errorMsg={errorMsg}
-            initialGithubUrl={effectiveGithubUrl}
-            initialAppUrl={effectiveAppUrl}
-          />
-        )}
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden font-sans selection:bg-primary/30">
+      {/* Dynamic Background Mesh */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-500/10 blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
+      </div>
 
-        {phase === "analyzing" && (
-          <AnalyzingPhase key="analyzing" jobData={jobData} />
-        )}
+      <div className="relative z-10 p-6 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
 
-        {phase === "ready" && analysis && (
-          <ReadyPhase
-            key="ready"
-            analysis={analysis}
-            editedTests={editedTests}
-            onExecute={handleExecute}
-            onReset={reset}
-            onSave={saveTest}
-            isExecuting={isExecuting}
-            errorMsg={errorMsg}
-            specTargetUrl={specTargetUrl}
-            onSpecTargetUrlChange={setSpecTargetUrl}
-          />
-        )}
 
-        {(phase === "executing" || phase === "done") && (
-          <ExecutionPhase
-            key="execution"
-            runStatus={runStatus}
-            onReset={reset}
-            phase={phase}
-            analysis={analysis}
-          />
-        )}
-      </AnimatePresence>
+        <div className="relative">
+          <AnimatePresence mode="wait">
+            {phase === "idle" && (
+              <InputPhase
+                key="input"
+                onAnalyze={async (g, t, e, p, prefs, numTests, mode, sha, msg, pat) => {
+                  activeTargetUrlRef.current = t;
+                  handleAnalyze(g, t, e, p, prefs, numTests, mode, sha, msg, pat || pipelinePat);
+                  
+                  // Silent fetch for baseline so it's ready for the toggle later
+                  try {
+                    const repoId = await api.getRepoId(g);
+                    const repoData = await baselineApi.getRepoTests(repoId);
+                    if (repoData && repoData.tests.length > 0) {
+                      setBaselineTests(repoData.tests);
+                    }
+                  } catch (err) {
+                    console.error("Failed to fetch baseline:", err);
+                  }
+                }}
+                onUploadSpec={(file, targetUrl, email, password) => handleUploadSpec(file, targetUrl, email, password)}
+                isAnalyzing={isStarting}
+                isParsing={isParsingSpec}
+                errorMsg={errorMsg}
+                initialGithubUrl={effectiveGithubUrl}
+                initialAppUrl={effectiveAppUrl}
+              />
+            )}
 
-      {phase === "idle" && <RunHistoryPanel />}
+            {phase === "analyzing" && (
+              <AnalyzingPhase key="analyzing" jobData={jobData} />
+            )}
+
+            {phase === "ready" && analysis && (
+              <ReadyPhase
+                key="ready"
+                analysis={analysis}
+                editedTests={editedTests}
+                onExecute={(combined) => {
+                  if (combined && selectedBaselineIds.size > 0) {
+                    const target = analysis.tech_stack.includes("Spec") 
+                      ? (specTargetUrl || "") 
+                      : (analysis.target_url || activeTargetUrlRef.current);
+                    handleExecuteDirect(combined as any, target, undefined, undefined);
+                  } else {
+                    handleExecute();
+                  }
+                }}
+                onReset={reset}
+                onSave={saveTest}
+                isExecuting={isExecuting}
+                errorMsg={errorMsg}
+                specTargetUrl={specTargetUrl}
+                onSpecTargetUrlChange={setSpecTargetUrl}
+                baselineTests={baselineTests}
+                selectedBaselineIds={selectedBaselineIds}
+                onBaselineToggle={(checked) => {
+                  if (checked) setShowSuiteSelector(true);
+                  else setSelectedBaselineIds(new Set());
+                }}
+              />
+            )}
+
+            {(phase === "executing" || phase === "done") && (
+              <ExecutionPhase
+                key="execution"
+                runStatus={runStatus}
+                onReset={reset}
+                phase={phase}
+                analysis={analysis}
+              />
+            )}
+          </AnimatePresence>
+
+          {phase === "idle" && <RunHistoryPanel />}
+
+          {/* ── Baseline Suite Selection Modal ────────────────────────────────────── */}
+          <Dialog open={showSuiteSelector} onOpenChange={setShowSuiteSelector}>
+            <DialogContent className="max-w-5xl p-0 overflow-hidden border-border/40 shadow-2xl backdrop-blur-3xl rounded-[2.5rem]">
+              <div className="p-8 bg-primary/5 border-b border-border/20">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-4 text-xl font-black uppercase tracking-widest">
+                    <div className="p-2.5 rounded-2xl bg-primary/10 border border-primary/20 shadow-inner">
+                      <Layers className="h-6 w-6 text-primary" />
+                    </div>
+                    Repo Baseline Inventory
+                  </DialogTitle>
+                  <DialogDescription className="text-muted-foreground/70 font-medium ml-14">
+                    We found <span className="text-foreground font-bold">{baselineTests.length} legacy testcases</span> in this repository. Select units to augment your run.
+                  </DialogDescription>
+                </DialogHeader>
+
+                {phase !== "ready" && (
+                  <div className="mt-8 space-y-4 ml-14">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <button
+                        onClick={() => {
+                          const mapped = baselineTests.map(bt => ({
+                            id: bt.test_id,
+                            analysis_id: "baseline",
+                            name: bt.name,
+                            description: bt.description,
+                            page_name: bt.page_path || "/",
+                            severity: bt.severity,
+                            steps: bt.steps.map(s => ({
+                              action: s.action,
+                              selector: s.target,
+                              value: s.value,
+                              description: s.assertion || ""
+                            }))
+                          } as PlaywrightTestCase));
+
+                          setAnalysis({
+                            analysis_id: "baseline",
+                            target_url: activeTargetUrlRef.current,
+                            summary: "Merged Suite: Global Baseline",
+                            tech_stack: "Global Baseline",
+                            pages: [],
+                            user_flows: [],
+                            tests: mapped
+                          });
+                          setEditedTests(mapped);
+                          setSelectedBaselineIds(new Set(baselineTests.map(t => t.test_id)));
+                          setPhase("ready");
+                          setShowSuiteSelector(false);
+                        }}
+                        className="flex items-center gap-4 p-4 rounded-2xl border border-border/50 bg-background/50 hover:bg-muted/40 transition-all group text-left"
+                      >
+                        <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:scale-110 transition-transform flex-shrink-0">
+                          <Play className="h-5 w-5 fill-current" />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-black uppercase tracking-widest">Run Full Baseline</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">Execute existing {baselineTests.length} production units.</p>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowSuiteSelector(false);
+                          // Using a fallback trigger here if needed, but usually onAnalyze already called handleAnalyze
+                          // So this button might just be "Continue to AI Generation"
+                          toast.info("AI Analysis already in progress...");
+                        }}
+                        className="flex items-center gap-4 p-4 rounded-2xl border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-all group text-left shadow-[0_0_20px_rgba(var(--primary),0.05)]"
+                      >
+                        <div className="h-10 w-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary group-hover:scale-110 transition-transform flex-shrink-0">
+                          <Sparkles className="h-5 w-5 fill-current" />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-black uppercase tracking-widest text-primary">Generate Expansion</p>
+                          <p className="text-[10px] text-primary/60 mt-0.5 font-medium">Use AI to discover and test new flows.</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-8 space-y-4 ml-14">
+
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/40" />
+                      <Input
+                        placeholder="Filter baseline by identity or description..."
+                        className="pl-12 h-12 bg-background border-border/40 rounded-2xl shadow-sm focus-visible:ring-primary/20 transition-all font-medium text-sm"
+                        value={baselineSearch}
+                        onChange={(e) => setBaselineSearch(e.target.value)}
+                      />
+                    </div>
+
+                    <Select value={activePageFilter} onValueChange={setActivePageFilter}>
+                      <SelectTrigger className="w-[240px] h-12 bg-background border-border/40 rounded-2xl shadow-sm focus:ring-primary/20 font-black uppercase tracking-widest text-[10px]">
+                        <div className="flex items-center gap-2">
+                          <Filter className="h-3.5 w-3.5 text-primary/60" />
+                          <SelectValue placeholder="Segment by Page" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-border/40 shadow-2xl backdrop-blur-xl">
+                        <SelectItem value="All" className="text-[10px] font-black uppercase tracking-widest py-3">Global Stream</SelectItem>
+                        {uniquePages.map(page => (
+                          <SelectItem key={page} value={page} className="text-[10px] font-black uppercase tracking-widest py-3">
+                            {page === "/" ? "App Root" : page.replace(/^\//, "")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-8 py-6">
+                <ScrollArea className="h-[450px] pr-6">
+                  <div className="space-y-3 ml-14">
+                    {filteredBaselines.length === 0 ? (
+                      <div className="py-24 text-center space-y-4">
+                        <div className="p-4 w-16 h-16 rounded-3xl bg-muted/20 border border-dashed border-border mx-auto flex items-center justify-center">
+                          <Search className="h-8 w-8 text-muted-foreground/30" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Zero Units Resolved</p>
+                          <p className="text-xs text-muted-foreground/60 font-medium">Refine your query parameters.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {filteredBaselines.map(bt => {
+                          const isSelected = selectedBaselineIds.has(bt.test_id);
+                          return (
+                            <div
+                              key={bt.test_id}
+                              className={cn(
+                                "group relative flex items-start gap-4 p-5 rounded-[1.75rem] border transition-all cursor-pointer",
+                                isSelected
+                                  ? "bg-primary/5 border-primary/40 shadow-inner"
+                                  : "bg-muted/5 border-border/40 hover:border-primary/20 hover:bg-muted/10"
+                              )}
+                              onClick={() => {
+                                setSelectedBaselineIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(bt.test_id)) next.delete(bt.test_id);
+                                  else next.add(bt.test_id);
+                                  return next;
+                                });
+                              }}
+                            >
+                              <Checkbox
+                                id={bt.test_id}
+                                checked={isSelected}
+                                className={cn(
+                                  "mt-1 rounded-md transition-transform duration-300",
+                                  isSelected && "scale-110"
+                                )}
+                              />
+                              <div className="flex-1 min-w-0 space-y-1.5">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-[13px] font-black truncate text-foreground/90 uppercase tracking-tight">
+                                    {bt.name}
+                                  </span>
+                                  <Badge variant="outline" className={cn(
+                                    "text-[8px] h-4 px-1.5 uppercase font-black shrink-0 tracking-widest rounded-md",
+                                    bt.severity.toLowerCase() === "critical" ? "border-red-500/50 text-red-400 bg-red-400/5" :
+                                      bt.severity.toLowerCase() === "high" ? "border-orange-500/50 text-orange-400 bg-orange-400/5" :
+                                        "border-muted-foreground/30 text-muted-foreground"
+                                  )}>
+                                    {bt.severity.slice(0, 3)}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground/60 font-medium">
+                                  <div className="flex items-center gap-1.5 bg-muted/30 px-2 py-0.5 rounded-lg font-mono text-[9px] border border-border/10">
+                                    <Code2 className="h-3 w-3 opacity-40" />
+                                    {bt.page_path || "/"}
+                                  </div>
+                                </div>
+                                {bt.description && (
+                                  <p className="text-[10px] text-muted-foreground/50 italic line-clamp-1 border-l border-border/20 pl-2">{bt.description}</p>
+                                )}
+                              </div>
+                              {isSelected && (
+                                <motion.div
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  className="absolute -right-1 -top-1"
+                                >
+                                  <div className="bg-primary text-primary-foreground h-5 w-5 p-0 flex items-center justify-center rounded-full border-2 border-background shadow-2xl">
+                                    <Check className="h-2.5 w-2.5 stroke-[3]" />
+                                  </div>
+                                </motion.div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <div className="p-8 pt-4 bg-muted/20 border-t border-border/20 backdrop-blur-md">
+                <div className="flex items-center justify-between mb-6 ml-14">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.25em] mb-1">Queue Configuration</span>
+                    <div className="text-xs font-bold text-foreground">
+                      <span className="text-primary text-lg font-black mr-1.5">{selectedBaselineIds.size}</span> Units selected for synchronization
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground hover:bg-background/80 rounded-xl px-4"
+                      onClick={() => setSelectedBaselineIds(new Set())}
+                    >
+                      Clear Selection
+                    </Button>
+                    <div className="w-px h-4 bg-border" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 rounded-xl px-4"
+                      onClick={() => setSelectedBaselineIds(new Set(baselineTests.map(t => t.test_id)))}
+                    >
+                      Select All
+                    </Button>
+                  </div>
+                </div>
+                <div className="ml-14 flex items-center gap-4">
+                  <Button variant="outline" className="h-12 px-6 rounded-2xl font-black uppercase tracking-widest text-[11px]" onClick={() => setShowSuiteSelector(false)}>
+                    Cancel
+                  </Button>
+                  <Button className="flex-1 font-black uppercase tracking-widest h-12 shadow-[0_10px_30px_rgba(var(--primary),0.2)] rounded-2xl text-[11px]" onClick={() => {
+                    if (phase === "ready") {
+                      setShowSuiteSelector(false);
+                      return;
+                    }
+
+                    const selected = baselineTests.filter(bt => selectedBaselineIds.has(bt.test_id));
+                    if (selected.length === 0) {
+                      toast.error("Please select at least one test or choose a preset.");
+                      return;
+                    }
+                    const mapped = selected.map(bt => ({
+                      id: bt.test_id,
+                      analysis_id: "baseline",
+                      name: bt.name,
+                      description: bt.description,
+                      page_name: bt.page_path || "/",
+                      severity: bt.severity,
+                      steps: bt.steps.map(s => ({
+                        action: s.action,
+                        selector: s.target,
+                        value: s.value,
+                        description: s.assertion || ""
+                      }))
+                    } as PlaywrightTestCase));
+
+                    setAnalysis({
+                      analysis_id: "hybrid",
+                      target_url: activeTargetUrlRef.current,
+                      summary: `Selection Mode: ${mapped.length} tests chosen`,
+                      tech_stack: "Hybrid Selection",
+                      pages: [],
+                      user_flows: [],
+                      tests: mapped
+                    });
+                    setEditedTests(mapped);
+                    setPhase("ready");
+                    setShowSuiteSelector(false);
+                  }}>
+                    {phase === "ready" ? `Integrate ${selectedBaselineIds.size} Units` : `Start Live Simulation (${selectedBaselineIds.size} Units)`}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
     </div>
   );
 }

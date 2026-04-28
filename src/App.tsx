@@ -27,6 +27,7 @@ import UserProfile from "./pages/UserProfile";
 import Deployments from "./pages/Deployments.tsx";
 import ApiCosts from "./pages/ApiCosts";
 import AiIde from "./pages/AiIde";
+import RepoBaseline from "./pages/RepoBaseline";
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
           {/* Hidden admin route — not in sidebar */}
           <Route path="/cost-tracker" element={<ApiCosts />} />
           <Route path="/ai-ide" element={<AiIde />} />
+          <Route path="/repo-baseline" element={<RepoBaseline />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

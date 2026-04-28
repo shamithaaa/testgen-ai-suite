@@ -162,6 +162,7 @@ async def run_analysis(job_id: str) -> None:
         job["completed_at"] = datetime.now(timezone.utc).isoformat()
         job["result"] = {
             "analysis_id": analysis_id,
+            "target_url": job["target_url"],
             "summary": analysis_data.get("summary", ""),
             "tech_stack": analysis_data.get("tech_stack", ""),
             "pages": analysis_data.get("pages", []),
@@ -283,6 +284,7 @@ async def run_commit_analysis(job_id: str) -> None:
         job["completed_at"] = datetime.now(timezone.utc).isoformat()
         job["result"] = {
             "analysis_id": analysis_id,
+            "target_url": job["target_url"],
             "summary": analysis_data.get("summary", ""),
             "tech_stack": analysis_data.get("tech_stack", ""),
             "pages": analysis_data.get("pages", []),

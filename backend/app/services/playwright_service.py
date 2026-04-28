@@ -1016,7 +1016,10 @@ async def execute_playwright_tests(
                         live_result["step_results"].append(sr)
                         live_result["steps_completed"] += 1
 
-                    await ctx.close()
+                    try:
+                        await ctx.close()
+                    except Exception:
+                        pass
 
                     failed_steps = [s for s in live_result["step_results"] if s["status"] == "fail"]
                     live_result["status"] = "failed" if failed_steps else "passed"
@@ -1034,7 +1037,11 @@ async def execute_playwright_tests(
                 else:
                     _runs[run_id]["failed"] += 1
 
-            await browser.close()
+            try:
+                await browser.close()
+            except Exception:
+                # Browser might already be closed or connection lost; ignore cleanup errors
+                pass
 
         _runs[run_id]["status"] = "completed"
         _runs[run_id]["completed_at"] = _utcnow()

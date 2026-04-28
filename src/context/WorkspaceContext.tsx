@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import type { FileNode, WorkspaceInfo, CopilotSuggestion, ChatMessage, WorkspaceSuggestResponse } from "@/lib/api";
+import type { FileNode, WorkspaceInfo, CopilotSuggestion, ChatMessage, WorkspaceSuggestResponse, FileTestGroup } from "@/lib/api";
 
 export interface EditorTab {
   path: string;
@@ -53,6 +53,9 @@ interface WorkspaceState {
   setActiveTab: (path: string) => void;
   updateTabContent: (path: string, content: string) => void;
   markTabSaved: (path: string) => void;
+  
+  fileTests: FileTestGroup[] | null;
+  setFileTests: (tests: FileTestGroup[] | null) => void;
 
   // Diff actions
   openDiff: (suggestion: CopilotSuggestion, filePath: string, language: string) => void;
@@ -81,6 +84,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [diffState, setDiffState] = useState<DiffState | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [currentBranch, setCurrentBranchState] = useState("main");
+  const [fileTests, setFileTests] = useState<FileTestGroup[] | null>(null);
 
   const setWorkspace = useCallback((w: WorkspaceInfo | null) => {
     setWorkspaceState(w);
@@ -255,6 +259,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         acceptFileDiff, rejectFileDiff, acceptAllDiffs, rejectAllDiffs, closeDiff,
         acceptDiff, rejectDiff,
         addChatMessage, setCurrentBranch,
+        fileTests, setFileTests,
       }}
     >
       {children}

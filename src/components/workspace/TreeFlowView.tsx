@@ -31,7 +31,9 @@ import {
   FlaskConical,
   Download,
   X,
+  Layers,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { GephiSigmaGraph } from "@/components/workspace/GephiSigmaGraph";
 import {
@@ -45,6 +47,7 @@ import {
 import {
   api,
   impactApi,
+  baselineApi,
   type CommitImpactTreeNode,
   type FileChainAnalysis,
   type GraphEdge,
@@ -56,6 +59,8 @@ import { useWorkspaceContext } from "@/context/WorkspaceContext";
 import { usePipelineContext } from "@/context/PipelineContext";
 import { useCommitImpactTree } from "@/hooks/use-commit-impact";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -937,8 +942,7 @@ export function TreeFlowView({
   onBackToCode?: () => void;
   onTestsGenerated?: (tests: WorkspacePlaywrightTest[]) => void;
 } = {}) {
-  const { workspace } = useWorkspaceContext();
-  const { activeTab } = useWorkspaceContext();
+  const { workspace, activeTab, fileTests, setFileTests } = useWorkspaceContext();
   const { githubPat } = usePipelineContext();
   const impactQuery = useCommitImpactTree(workspace?.workspace_id ?? null, 5, githubPat || undefined);
   const fallbackGraphQuery = useQuery({
@@ -955,12 +959,27 @@ export function TreeFlowView({
 
   const [generatingTests, setGeneratingTests] = useState(false);
   const [generatingFile, setGeneratingFile] = useState<string | null>(null);
-  const [fileTests, setFileTests] = useState<FileTestGroup[] | null>(null);
   const [flowViewMode, setFlowViewMode] = useState<"chain" | "neighborhood" | "gephi">("gephi");
   const [dialogPhase, setDialogPhase] = useState<"closed" | "analyzing" | "review">("closed");
   const [perFileAnalysis, setPerFileAnalysis] = useState<
     Array<FileChainAnalysis & { requestedCount: number; isLeaf: boolean; isRoot: boolean }>
   >([]);
+  const [baselineTests, setBaselineTests] = useState<any[]>([]);
+
+  // Fetch baseline on mount
+  useEffect(() => {
+    if (!workspace?.repo_url) return;
+    const fetchBaseline = async () => {
+      try {
+        const repoId = await api.getRepoId(workspace.repo_url);
+        const data = await baselineApi.getRepoTests(repoId);
+        setBaselineTests(data.tests || []);
+      } catch (err) {
+        console.error("Failed to fetch baseline:", err);
+      }
+    };
+    fetchBaseline();
+  }, [workspace?.repo_url]);
 
   const roots = impactQuery.data?.roots ?? [];
   const impactNodeMap = useMemo(() => flattenImpactTree(roots), [roots]);
@@ -1133,7 +1152,7 @@ export function TreeFlowView({
   const totalTests = fileTests?.reduce((acc, g) => acc + g.tests.length, 0) ?? 0;
 
   return (
-    <div className="h-full flex flex-col min-h-0 bg-background">
+    <div className="h-full flex flex-col min-h-0 bg-background overflow-hidden relative">
       {/* ── Header ── */}
       <div className="flex-shrink-0 px-4 py-2 border-b border-border/40 bg-muted/10">
         <div className="flex items-center gap-2">
@@ -1230,7 +1249,7 @@ export function TreeFlowView({
       </div>
 
       {/* ── Flow canvas ── */}
-      <div className={cn("min-h-0 transition-all duration-300", hasTests || generatingTests ? "flex-[2]" : "flex-1")}>
+      <div className={cn("min-h-0 transition-all duration-300 relative flex-1")}>
         {chain.length === 0 || isNotInTree ? (
           <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/50 p-8">
             <Code2 className="h-8 w-8 opacity-20" />
@@ -1262,11 +1281,150 @@ export function TreeFlowView({
             />
           )
         )}
+
+        {/* Global Test Alignment Bottom Panel */}
+        <AnimatePresence>
+          {(fileTests || baselineTests.length > 0) && (
+            <motion.div
+              initial={{ y: 200, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 200, opacity: 0 }}
+              className="absolute bottom-4 left-4 right-4 z-[50]"
+            >
+              <div className="bg-background/80 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl overflow-hidden max-h-[400px] flex flex-col border-primary/20">
+                <div className="flex items-center justify-between px-4 py-2 bg-primary/5 border-b border-border/20">
+                  <div className="flex items-center gap-2">
+                    {generatingTests && (
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 animate-pulse">
+                        <Loader2 className="h-2.5 w-2.5 text-primary animate-spin" />
+                        <span className="text-[9px] font-bold text-primary uppercase">AI Generating...</span>
+                      </div>
+                    )}
+                    <FlaskConical className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-bold tracking-tight">Test Intelligence Alignment</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {fileTests && (
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-7 text-[10px] text-muted-foreground hover:text-foreground"
+                        onClick={handleDownloadGeneratedTests}
+                      >
+                        <Download className="h-3 w-3 mr-1.5" />
+                        Download Spec
+                      </Button>
+                    )}
+                    <button 
+                      className="p-1 hover:bg-muted rounded-full transition-colors"
+                      onClick={() => setFileTests(null)}
+                    >
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-hidden">
+                  {generatingTests ? (
+                    <div className="h-[240px] flex flex-col items-center justify-center space-y-4 bg-muted/5 border border-dashed border-border/20 rounded-xl m-4">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse" />
+                        <Loader2 className="h-10 w-10 text-primary animate-spin relative z-10" />
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="text-sm font-bold text-foreground/80 tracking-tight">AI Engineering Contextual Tests...</p>
+                        <p className="text-[10px] text-muted-foreground animate-pulse">Analyzing dependency impact for {activeTab}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 space-y-4">
+                      {/* Session-Only Focused Preview */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-border/10 pb-2">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-bold tracking-tight">Generated Session Coverage</span>
+                          </div>
+                          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-bold px-2">
+                            {fileTests?.reduce((s, g) => s + g.tests.length, 0) || 0} Tests Ready
+                          </Badge>
+                        </div>
+
+                        {!fileTests || fileTests.length === 0 ? (
+                          <div className="py-16 text-center rounded-xl border border-dashed border-border/20 bg-muted/5 space-y-2">
+                            <FlaskConical className="h-8 w-8 text-muted-foreground/20 mx-auto" />
+                            <p className="text-xs text-muted-foreground italic">No tests generated for this session yet.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 gap-3 max-h-[300px] overflow-auto pr-2 scrollbar-thin">
+                              {fileTests.map((group) => (
+                                <div key={group.filePath} className="rounded-xl border border-border/40 bg-card/60 p-3 space-y-2.5 hover:border-primary/30 transition-all shadow-sm">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <FileCode className="h-3.5 w-3.5 text-blue-400" />
+                                    <span className="text-[11px] font-mono font-bold text-foreground/80 truncate flex-1">{group.filePath}</span>
+                                    <Badge className="text-[9px] h-4 px-1.5 bg-muted/40 text-muted-foreground">{group.tests.length}</Badge>
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-1.5">
+                                    {group.tests.map((test) => (
+                                      <div key={test.id} className="flex items-center gap-2 py-1.5 px-3 rounded-lg bg-background/40 border border-border/20 group hover:border-primary/20 transition-colors shadow-inner">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary/30 group-hover:bg-primary transition-colors" />
+                                        <span className="text-[11px] text-foreground/80 truncate flex-1">{test.name}</span>
+                                        <Badge variant="outline" className="text-[8px] h-3.5 px-1.5 opacity-60 uppercase font-black">
+                                          {test.severity.slice(0, 3)}
+                                        </Badge>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <Button 
+                              className="w-full h-11 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 rounded-xl"
+                              onClick={async () => {
+                                if (!workspace?.repo_url || !fileTests) return;
+                                try {
+                                  const repoId = await api.getRepoId(workspace.repo_url);
+                                  const allTests = fileTests.flatMap(g => g.tests).map(t => ({
+                                    test_id: t.id,
+                                    name: t.name,
+                                    description: t.description,
+                                    page_path: t.page_name || "/",
+                                    severity: t.severity,
+                                    steps: t.steps.map(s => ({
+                                      action: s.action,
+                                      target: s.selector || "",
+                                      value: s.value || "",
+                                      assertion: s.description || ""
+                                    }))
+                                  } as any));
+                                  const res = await baselineApi.syncTests(repoId, allTests, "workspace");
+                                  toast.success(`Synced ${res.added_count} tests to repository baseline!`);
+                                  setFileTests(null);
+                                } catch (err) {
+                                  toast.error("Failed to sync tests");
+                                }
+                              }}
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Promote & Sync All Session Tests to Repo Baseline
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* ── Generated Tests panel ── */}
-      {(hasTests || generatingTests) && (
-        <div className="flex-[3] border-t border-border/40 flex flex-col min-h-0 bg-background">
+      {/* ── Generated Tests panel (STILL SUPPORTED FOR INDIVIDUAL REVIEW) ── */}
+      {hasTests && false && (
+        <div className="flex-[3] border-t border-border/40 flex flex-col min-h-0 bg-background max-h-[60%]">
           {/* Panel header */}
           <div className="flex-shrink-0 px-4 py-2 border-b border-border/30 bg-muted/10 flex items-center gap-2">
             <FlaskConical className="h-3.5 w-3.5 text-primary/70" />
@@ -1296,21 +1454,6 @@ export function TreeFlowView({
               </button>
             )}
           </div>
-
-          {/* Loading state */}
-          {generatingTests && !hasTests && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-5 w-5 animate-spin text-primary/60" />
-                <span className="text-sm">
-                  {generatingFile ? `Analysing ${generatingFile}…` : "Generating test cases…"}
-                </span>
-              </div>
-              <p className="text-[11px] text-muted-foreground/50 text-center max-w-xs">
-                Generating Playwright test cases for each file in the root-to-leaf chain
-              </p>
-            </div>
-          )}
 
           {/* Tests content */}
           {hasTests && (

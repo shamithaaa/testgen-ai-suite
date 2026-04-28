@@ -19,6 +19,8 @@ _client = AzureOpenAI(
     azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
     api_key=settings.AZURE_OPENAI_KEY,
     api_version=settings.AZURE_OPENAI_API_VERSION,
+    timeout=600.0,
+    max_retries=3,
 )
 _DEPLOYMENT = settings.AZURE_OPENAI_DEPLOYMENT
 
@@ -44,6 +46,8 @@ _TASK_LABELS: dict[str, str] = {
     "generate_predictive_alert": "Generate Predictive Alert",
     "generate_playwright_tests_from_source": "Generate Playwright Tests (Source)",
     "call_ai": "AI Copilot / Workspace",
+    "generate_baseline_tests": "Baseline Full Scan",
+    "generate_incremental_tests": "Baseline Incremental Scan",
 }
 
 # --- rate-limit handling ---------------------------------------------------
@@ -1411,4 +1415,243 @@ Rules:
         test.setdefault("analysis_id", "workspace")
 
     return tests
+
+
+# ─── Repo Baseline: Full-Scan & Incremental Generators ─────────────────────
+# These two functions power the new "smart baseline" pipeline:
+#   generate_baseline_tests  → first scan of a repo (or forced full rescan)
+#   generate_incremental_tests → re-scan only changed files
+
+_BASELINE_SYSTEM_PROMPT = """You are a senior QA engineer who writes production-grade Playwright test cases.
+
+RULES:
+1. Read the actual code provided — do NOT generate generic Lorem-ipsum tests.
+2. Assign category from EXACTLY this list:
+   auth, api, ui_form, ui_navigation, ui_component, crud, integration, edge_case, performance, accessibility
+3. Choose the MOST PRECISE category:
+   - auth → anything involving login, logout, sessions, JWT, protected routes
+   - api → fetch calls, REST handlers, HTTP status validations
+   - ui_form → <form>, handleSubmit, input validation, error messages
+   - ui_navigation → <Link>, router.push, nav menus, breadcrumbs
+   - ui_component → isolated components (modals, tables, dropdowns)
+   - crud → create/read/update/delete operations on entities
+   - integration → multiple services cooperating (e.g. API + DB + UI)
+   - edge_case → null checks, empty states, 404, boundary values
+   - performance → loading skeletons, debounce, lazy load, timeouts
+   - accessibility → aria-*, role, keyboard navigation, focus management
+   Do NOT default everything to ui_component.
+4. page_path = the actual URL route (e.g. /dashboard/users), not a component name
+5. component_name = React/Vue component name (e.g. UserEditModal)
+6. endpoint = "METHOD /path" for API tests (e.g. "POST /api/orders")
+7. severity: critical = auth/payment, high = core CRUD, medium = flows, low = edge cases
+8. playwright_code must be valid, runnable Playwright TypeScript code wrapped in:
+   test('...', async ({ page }) => { ... });
+9. Return ONLY valid JSON. No markdown fences. No explanation outside the JSON."""
+
+_FULL_SCAN_USER_PROMPT = """Analyse this codebase chunk and generate comprehensive Playwright test cases.
+
+CODEBASE CHUNK:
+{code_chunks}
+
+Generate between 5 and 15 test cases covering the functionality found in this chunk.
+Aim for good distribution across the categories that actually appear in this chunk.
+Every test must be grounded in real code you can see above — no hallucinated features.
+
+Return JSON with EXACTLY this structure (no extra keys):
+{{
+  "tests": [
+    {{
+      "name": "Human-readable test name",
+      "description": "One sentence: what this test verifies",
+      "category": "auth",
+      "page_path": "/login",
+      "component_name": null,
+      "endpoint": null,
+      "severity": "critical",
+      "source_file": "src/pages/Login.tsx",
+      "steps": [
+        {{"action": "navigate", "target": "/login", "value": null, "assertion": null}},
+        {{"action": "fill", "target": "input[type=email]", "value": "test@example.com", "assertion": null}},
+        {{"action": "fill", "target": "input[type=password]", "value": "password123", "assertion": null}},
+        {{"action": "click", "target": "button[type=submit]", "value": null, "assertion": null}},
+        {{"action": "expect", "target": "/dashboard", "value": null, "assertion": "url contains /dashboard"}}
+      ],
+      "playwright_code": "test('User can log in with valid credentials', async ({{ page }}) => {{\\n  await page.goto('/login');\\n  await page.fill('input[type=email]', 'test@example.com');\\n  await page.fill('input[type=password]', 'password123');\\n  await page.click('button[type=submit]');\\n  await page.waitForURL('**/dashboard');\\n  await expect(page).toHaveURL(/dashboard/);\\n}});"
+    }}
+  ]
+}}"""
+
+_INCREMENTAL_USER_PROMPT = """Analyse ONLY the changed files below and generate NEW Playwright test cases.
+
+CHANGED FILES (what was modified in this commit/push):
+{changed_code}
+
+EXISTING TESTS ALREADY IN DATABASE (DO NOT duplicate any of these):
+{existing_tests_summary}
+
+TASK:
+- Generate test cases ONLY for new/changed logic visible in the files above.
+- Do NOT outputs tests already covered by the existing list, even if you rephrase the name.
+- If the change is minor (typo fix, whitespace, comment-only), return {{"tests": []}}.
+- Focus on: new API endpoints, new routes, new components, changed business logic, new validations.
+- Same JSON structure and rules as a full scan apply.
+
+Return {{"tests": []}} if nothing genuinely new was introduced."""
+
+
+def _validate_ai_test(raw: dict[str, Any], session_id: str) -> "dict[str, Any] | None":
+    """
+    Validate and normalise a single AI-generated test dict.
+    Returns None if the test should be discarded (malformed / empty).
+    Never raises — a bad test from the AI must not crash the whole run.
+    """
+    try:
+        if not raw.get("name") or not raw.get("description"):
+            return None
+        steps = raw.get("steps", [])
+        if not steps:
+            return None
+
+        from app.models.repo_baseline import coerce_category
+        category = coerce_category(raw.get("category"))
+
+        severity = (raw.get("severity") or "medium").strip().lower()
+        if severity not in {"critical", "high", "medium", "low"}:
+            severity = "medium"
+
+        return {
+            "test_id": f"TC-{uuid.uuid4().hex[:6].upper()}",
+            "name": str(raw["name"])[:200],
+            "description": str(raw.get("description", ""))[:500],
+            "category": category,
+            "page_path": raw.get("page_path") or None,
+            "component_name": raw.get("component_name") or None,
+            "endpoint": raw.get("endpoint") or None,
+            "severity": severity,
+            "source_file": raw.get("source_file") or None,
+            "steps": steps,
+            "playwright_code": str(raw.get("playwright_code", "")),
+            "added_in_session": session_id,
+            "is_active": True,
+        }
+    except Exception:
+        return None
+
+
+def _fix_json_response(raw: str) -> str:
+    """Attempt to extract a JSON object/array from a response with extra prose."""
+    import re as _re
+    # Try to find the outermost { ... }
+    m = _re.search(r'(\{.*\})', raw, _re.DOTALL)
+    if m:
+        return m.group(1)
+    return raw
+
+
+async def generate_baseline_tests(
+    code_chunks: list[str],
+    session_id: str,
+    task_name: str = "generate_baseline_tests",
+) -> list[dict[str, Any]]:
+    """
+    Full-repo scan: send extracted source file chunks to the AI concurrently and receive a complete
+    set of categorised Playwright tests.
+
+    Returns a list of validated test dicts ready to be stored in MongoDB.
+    """
+    async def process_chunk(chunk: str) -> list[dict[str, Any]]:
+        prompt_text = f"{_BASELINE_SYSTEM_PROMPT}\n\n{_FULL_SCAN_USER_PROMPT.format(code_chunks=chunk)}"
+        for attempt in range(3):
+            try:
+                raw_content, prompt_tokens, completion_tokens = await asyncio.to_thread(
+                    _call_openai_sync, prompt_text, True
+                )
+                asyncio.create_task(_log_cost(task_name, prompt_tokens, completion_tokens))
+                cleaned = _clean_json(raw_content)
+                parsed = json.loads(cleaned)
+                return parsed.get("tests", [])
+            except json.JSONDecodeError:
+                if attempt == 2:
+                    return []
+            except Exception:
+                if attempt == 2:
+                    return []
+        return []
+
+    # Run AI evaluation concurrently for all chunks
+    tasks = [process_chunk(chunk) for chunk in code_chunks]
+    chunk_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    raw_tests: list[dict[str, Any]] = []
+    for res in chunk_results:
+        if isinstance(res, list):
+            raw_tests.extend(res)
+
+    validated = []
+    for raw in raw_tests:
+        clean = _validate_ai_test(raw, session_id)
+        if clean:
+            validated.append(clean)
+
+    return validated
+
+
+async def generate_incremental_tests(
+    changed_code: str,
+    existing_tests: list[dict[str, Any]],
+    session_id: str,
+    task_name: str = "generate_incremental_tests",
+) -> list[dict[str, Any]]:
+    """
+    Incremental scan: send only changed file content + a compact summary of existing
+    tests so the AI knows what NOT to generate.
+
+    Returns a list of validated new test dicts.
+    """
+    # Compact summary: name + category + page_path only (saves tokens)
+    summary = [
+        {
+            "name": t.get("name"),
+            "category": t.get("category"),
+            "page_path": t.get("page_path"),
+            "endpoint": t.get("endpoint"),
+        }
+        for t in existing_tests
+    ]
+
+    prompt_text = (
+        f"{_BASELINE_SYSTEM_PROMPT}\n\n"
+        + _INCREMENTAL_USER_PROMPT.format(
+            changed_code=changed_code,
+            existing_tests_summary=json.dumps(summary, indent=2),
+        )
+    )
+
+    raw_tests: list[dict[str, Any]] = []
+    for attempt in range(3):
+        try:
+            raw_content, prompt_tokens, completion_tokens = await asyncio.to_thread(
+                _call_openai_sync, prompt_text, True
+            )
+            asyncio.create_task(_log_cost(task_name, prompt_tokens, completion_tokens))
+            cleaned = _clean_json(raw_content)
+            parsed = json.loads(cleaned)
+            raw_tests = parsed.get("tests", [])
+            break
+        except json.JSONDecodeError:
+            if attempt == 2:
+                raw_tests = []  # graceful empty on repeated failure
+                break
+            raw_content = _fix_json_response(raw_content)
+        except Exception:
+            raise
+
+    validated = []
+    for raw in raw_tests:
+        clean = _validate_ai_test(raw, session_id)
+        if clean:
+            validated.append(clean)
+
+    return validated
+
 

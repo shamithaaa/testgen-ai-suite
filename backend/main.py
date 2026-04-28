@@ -15,11 +15,18 @@ from app.routes import (
     pipeline, impact, commit, deployments, prd, cost_logs,
 )
 from app.routes import ai_ide
+from app.routes import baseline as baseline_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
+    # Ensure repo_baselines collection indexes exist
+    try:
+        from app.services.baseline_store import ensure_indexes
+        await ensure_indexes()
+    except Exception as exc:
+        print(f"[DB] baseline index creation failed (non-fatal): {exc}")
     yield
     await close_db()
 
@@ -84,6 +91,9 @@ app.include_router(cost_logs.router, prefix=API_PREFIX)
 
 # AI IDE — streaming code generation workspace
 app.include_router(ai_ide.router, prefix=API_PREFIX)
+
+# Repo Baseline — smart categorised test generation with incremental diff
+app.include_router(baseline_router.router, prefix=API_PREFIX)
 
 
 @app.get("/", tags=["Health"])

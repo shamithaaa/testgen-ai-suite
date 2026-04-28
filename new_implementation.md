@@ -1,1045 +1,938 @@
-# Real-Time AI IDE — Production-Grade Build Plan
-### Streaming Code Generation Workspace with Live File Mutation
+# TestGen AI — Production Implementation Plan
+
+> **Goal:** Give a GitHub repo URL → auto-generate categorised Playwright test cases → store them → on re-submission detect what changed → append only new tests → show a clear diff UI of what was added.
 
 ---
 
 ## Table of Contents
 
 1. [System Overview](#1-system-overview)
-2. [Architecture Diagram](#2-architecture-diagram)
-3. [Tech Stack](#3-tech-stack)
-4. [Repository Structure](#4-repository-structure)
-5. [Phase-by-Phase Build Plan](#5-phase-by-phase-build-plan)
-6. [Backend Deep Dive](#6-backend-deep-dive)
-7. [Frontend Deep Dive](#7-frontend-deep-dive)
-8. [Streaming Engine](#8-streaming-engine)
-9. [Code Injection Engine](#9-code-injection-engine)
-10. [LLM Prompt Strategy](#10-llm-prompt-strategy)
-11. [State Management](#11-state-management)
-12. [Template System](#12-template-system)
-13. [Security & Production Hardening](#13-security--production-hardening)
-14. [Deployment Strategy](#14-deployment-strategy)
-15. [Known Blockers & How to Avoid Them](#15-known-blockers--how-to-avoid-them)
+2. [Tech Stack Decision](#2-tech-stack-decision)
+3. [Data Model Design](#3-data-model-design)
+4. [How Test Categories Are Decided](#4-how-test-categories-are-decided)
+5. [Backend Architecture](#5-backend-architecture)
+6. [AI Prompt Strategy](#6-ai-prompt-strategy)
+7. [Frontend Architecture](#7-frontend-architecture)
+8. [Step-by-Step Implementation](#8-step-by-step-implementation)
+9. [API Contract](#9-api-contract)
+10. [Folder Structure](#10-folder-structure)
+11. [Edge Cases & Production Guards](#11-edge-cases--production-guards)
+12. [What "No Blockers" Means Here](#12-what-no-blockers-means-here)
 
 ---
 
 ## 1. System Overview
 
-You are building a **real-time AI-powered IDE** — a browser-based workspace where a user types an idea ("create a biology dashboard") and watches the AI generate, create, and mutate files live, token by token, like Cursor or v0.dev.
-
-### Core User Flow
-
 ```
-User types idea
-    ↓
-Workspace is created from a base template (file tree appears instantly)
-    ↓
-WebSocket connection opens to backend
-    ↓
-Planner Agent decides: what files to create, what to modify
-    ↓
-Generator streams code token-by-token per file
-    ↓
-Frontend updates file tree + Monaco editor in real time
-    ↓
-Injection Engine patches existing files (e.g. App.js routes)
-    ↓
-Preview auto-refreshes (iframe or Vercel deploy)
-    ↓
-User sees working app
-```
-
----
-
-## 2. Architecture Diagram
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│                        BROWSER (React)                         │
-│                                                                │
-│  ┌──────────────┐   ┌─────────────────┐   ┌────────────────┐  │
-│  │  File Tree   │   │  Monaco Editor  │   │  Preview Panel │  │
-│  │  (Zustand)   │   │  (live tokens)  │   │  (iframe/port) │  │
-│  └──────┬───────┘   └────────┬────────┘   └───────┬────────┘  │
-│         │                   │                     │           │
-│         └──────────┬────────┘                     │           │
-│                    │  WebSocket Events             │           │
-└────────────────────┼──────────────────────────────┼───────────┘
-                     │                              │
-        ┌────────────▼──────────────┐               │
-        │     FastAPI Backend       │               │
-        │                           │               │
-        │  ┌─────────────────────┐  │               │
-        │  │   Planner Agent     │  │               │
-        │  │  (decides files)    │  │               │
-        │  └────────┬────────────┘  │               │
-        │           │               │               │
-        │  ┌────────▼────────────┐  │               │
-        │  │  Generator Engine   │  │               │
-        │  │  (LLM stream/file)  │  │               │
-        │  └────────┬────────────┘  │               │
-        │           │               │               │
-        │  ┌────────▼────────────┐  │               │
-        │  │  Injection Engine   │  │               │
-        │  │  (patch App.js)     │  │               │
-        │  └────────┬────────────┘  │               │
-        │           │               │               │
-        │  ┌────────▼────────────┐  │               │
-        │  │  Workspace Manager  │◄─┼───────────────┘
-        │  │  (file system / S3) │  │  (preview server)
-        │  └─────────────────────┘  │
-        └───────────────────────────┘
+User submits GitHub URL
+        │
+        ▼
+Backend clones / fetches repo
+        │
+        ▼
+Code Analyser → extract routes, components, functions, models
+        │
+        ▼
+AI Service → generate test cases with smart categorisation
+        │
+        ▼
+MongoDB stores tests under a repo fingerprint
+        │
+        ▼
+  ┌─────┴─────┐
+  │           │
+First time   Re-submit / changed files
+  │           │
+Store all   Diff existing tests vs new analysis
+            Append only genuinely new ones
+            Tag them with session_id + timestamp
+        │
+        ▼
+Frontend shows:
+  - Tabs: by detected category (auto, not hardcoded)
+  - Badge: "12 new tests added this run"
+  - History panel: past runs with counts
 ```
 
 ---
 
-## 3. Tech Stack
+## 2. Tech Stack Decision
 
-| Layer | Choice | Reason |
-|-------|--------|--------|
-| Frontend Framework | React 18 + Vite | Fast HMR, widely supported |
-| Editor | Monaco Editor | Same engine as VS Code |
-| State | Zustand | Lightweight, no boilerplate |
-| Routing | React Router v6 | Clean page-based navigation |
-| WebSocket client | Native WebSocket API | No extra deps needed |
-| Backend | FastAPI (Python 3.11+) | Async-native, WebSocket support |
-| LLM | Anthropic Claude via API | Structured streaming |
-| File System | Local (dev) → S3/EFS (prod) | Persistent workspaces |
-| Preview | Sandpack OR iframe + dev server | Live React preview |
-| Styling | Tailwind CSS | Utility-first, fast |
-| DB | PostgreSQL + SQLAlchemy | Workspace metadata |
-| Queue | Redis + Celery | Long-running generation jobs |
-| Deployment | Docker + Fly.io or Railway | Low-ops, WebSocket-friendly |
+| Layer | Choice | Why |
+|---|---|---|
+| Backend | FastAPI (Python) | Async, fast, clean Pydantic integration |
+| AI | Anthropic Claude (claude-sonnet-4) | Best instruction-following for structured JSON |
+| DB | MongoDB Atlas | Flexible schema for evolving test structures |
+| Repo fetch | GitPython + PyGithub | Clone or API-fetch without full clone |
+| Frontend | Next.js 14 + Tailwind + shadcn/ui | Fast, composable, good for dynamic lists |
+| State | Zustand | Lightweight, no Redux overhead |
+| Queue (prod) | Redis + Celery | Repo scan is slow, must be async |
 
 ---
 
-## 4. Repository Structure
+## 3. Data Model Design
 
-```
-repo/
-├── backend/
-│   ├── main.py                    # FastAPI app entry
-│   ├── routers/
-│   │   ├── workspace.py           # CRUD: create, list, delete workspaces
-│   │   └── generate.py            # WebSocket generation endpoint
-│   ├── engines/
-│   │   ├── planner.py             # Decides which files to create
-│   │   ├── generator.py           # Streams LLM output per file
-│   │   └── injector.py            # Patches existing files safely
-│   ├── templates/
-│   │   └── react-base/            # Base React template (Vite)
-│   │       ├── src/
-│   │       │   ├── App.jsx
-│   │       │   ├── main.jsx
-│   │       │   └── pages/
-│   │       ├── package.json
-│   │       └── vite.config.js
-│   ├── models/
-│   │   └── workspace.py           # SQLAlchemy models
-│   ├── utils/
-│   │   ├── fs.py                  # File system helpers
-│   │   └── llm.py                 # Claude API wrapper
-│   └── requirements.txt
-│
-├── frontend/
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Home.jsx           # Landing / workspace list
-│   │   │   ├── IdeaInput.jsx      # "What do you want to build?"
-│   │   │   └── Workspace.jsx      # Main IDE view
-│   │   ├── components/
-│   │   │   ├── FileTree.jsx       # Animated file explorer
-│   │   │   ├── CodeEditor.jsx     # Monaco wrapper
-│   │   │   ├── Preview.jsx        # Sandpack / iframe
-│   │   │   └── StatusBar.jsx      # Generation status
-│   │   ├── store/
-│   │   │   └── workspaceStore.js  # Zustand store
-│   │   ├── hooks/
-│   │   │   └── useGenerationWS.js # WebSocket hook
-│   │   └── App.jsx
-│   ├── index.html
-│   ├── vite.config.js
-│   └── package.json
-│
-├── docker-compose.yml
-└── README.md
-```
-
----
-
-## 5. Phase-by-Phase Build Plan
-
----
-
-### Phase 1 — Foundation (Days 1–3)
-
-**Goal:** Workspace creation + file tree renders immediately.
-
-#### Step 1.1 — Backend: Template Engine
+### 3.1 Repo Document (MongoDB)
 
 ```python
-# backend/engines/template.py
+# models/repo.py
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict
+from datetime import datetime
+from enum import Enum
+import uuid
 
-import shutil, uuid, os
+class TestCategory(str, Enum):
+    # These are DETECTED by AI, not hardcoded buckets
+    # AI reads the code and assigns the most fitting label
+    AUTH = "auth"
+    API = "api"
+    UI_FORM = "ui_form"
+    UI_NAVIGATION = "ui_navigation"
+    UI_COMPONENT = "ui_component"
+    CRUD = "crud"
+    INTEGRATION = "integration"
+    EDGE_CASE = "edge_case"
+    PERFORMANCE = "performance"
+    ACCESSIBILITY = "accessibility"
 
-TEMPLATES_DIR = "templates"
-WORKSPACES_DIR = "workspaces"
+class TestStep(BaseModel):
+    action: str          # "click", "fill", "expect", "navigate"
+    target: str          # selector or URL
+    value: Optional[str] = None
+    assertion: Optional[str] = None
 
-def create_workspace(template: str = "react-base") -> str:
-    workspace_id = str(uuid.uuid4())
-    src = os.path.join(TEMPLATES_DIR, template)
-    dst = os.path.join(WORKSPACES_DIR, workspace_id)
-    shutil.copytree(src, dst)
-    return workspace_id
+class PlaywrightTest(BaseModel):
+    test_id: str = Field(default_factory=lambda: f"TC-{uuid.uuid4().hex[:6].upper()}")
+    name: str
+    description: str
+    category: TestCategory
+    
+    # For UI tests — which page/route this test belongs to
+    # AI extracts this from the route path or component name
+    page_path: Optional[str] = None      # e.g. "/dashboard", "/auth/login"
+    component_name: Optional[str] = None # e.g. "LoginForm", "UserTable"
+    
+    # For API tests
+    endpoint: Optional[str] = None       # e.g. "POST /api/users"
+    
+    severity: str  # "critical", "high", "medium", "low"
+    steps: List[TestStep] = []
+    playwright_code: str  # Actual runnable Playwright test code
+    
+    # Tracking
+    added_in_session: str     # session_id of the run that created this
+    source_file: Optional[str] = None  # which file triggered this test
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    is_active: bool = True    # soft delete instead of removing
+
+class ScanSession(BaseModel):
+    session_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    github_url: str
+    scan_type: str       # "full" or "incremental"
+    changed_files: List[str] = []
+    tests_added: int = 0
+    tests_total_after: int = 0
+    triggered_at: datetime = Field(default_factory=datetime.utcnow)
+    status: str = "pending"  # "pending", "running", "done", "failed"
+    error: Optional[str] = None
+
+class RepoBaseline(BaseModel):
+    # One document per repo in MongoDB
+    repo_id: str          # SHA256 of normalised github_url
+    github_url: str
+    default_branch: str = "main"
+    last_commit_sha: str = ""
+    tests: List[PlaywrightTest] = []
+    sessions: List[ScanSession] = []
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 ```
 
-#### Step 1.2 — Backend: Workspace Router
-
-```python
-# backend/routers/workspace.py
-
-from fastapi import APIRouter
-from engines.template import create_workspace
-from utils.fs import list_files
-
-router = APIRouter()
-
-@router.post("/workspace/create")
-async def create():
-    workspace_id = create_workspace()
-    files = list_files(workspace_id)
-    return {"workspace_id": workspace_id, "files": files}
-
-@router.get("/workspace/{workspace_id}/files")
-async def get_files(workspace_id: str):
-    return list_files(workspace_id)
-```
-
-#### Step 1.3 — Frontend: File Tree Component
-
-```jsx
-// frontend/src/components/FileTree.jsx
-import { useWorkspaceStore } from '../store/workspaceStore'
-import { motion, AnimatePresence } from 'framer-motion'
-
-export default function FileTree() {
-  const files = useWorkspaceStore(s => s.files)
-
-  return (
-    <div className="file-tree">
-      <AnimatePresence>
-        {Object.keys(files).map(path => (
-          <motion.div
-            key={path}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="file-item"
-          >
-            {path}
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  )
-}
-```
-
-**Deliverable:** POST `/workspace/create` → file tree renders in browser in < 200ms.
-
----
-
-### Phase 2 — Streaming Engine (Days 4–6)
-
-**Goal:** WebSocket streams tokens live to Monaco editor.
-
-#### Step 2.1 — WebSocket Event Schema
-
-All backend → frontend messages are typed JSON events. Never send plain text.
-
-```typescript
-// Event Types (use these exactly)
-
-type WSEvent =
-  | { type: "FILE_CREATE";  path: string }
-  | { type: "STREAM_TOKEN"; path: string; token: string }
-  | { type: "FILE_UPDATE";  path: string; content: string }
-  | { type: "FILE_DONE";    path: string }
-  | { type: "GENERATION_DONE" }
-  | { type: "ERROR";        message: string }
-```
-
-#### Step 2.2 — Backend: WebSocket Endpoint
-
-```python
-# backend/routers/generate.py
-
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from engines.planner import plan_files
-from engines.generator import stream_file
-from engines.injector import inject_routes
-from utils.fs import save_file, read_file
-
-router = APIRouter()
-
-@router.websocket("/ws/generate/{workspace_id}")
-async def generate(ws: WebSocket, workspace_id: str):
-    await ws.accept()
-
-    try:
-        idea = await ws.receive_text()
-
-        # Step 1: Plan
-        plan = await plan_files(idea)
-
-        # Step 2: Generate each file
-        for file_spec in plan["files"]:
-            path = file_spec["path"]
-
-            await ws.send_json({"type": "FILE_CREATE", "path": path})
-
-            content = ""
-            async for token in stream_file(file_spec):
-                content += token
-                await ws.send_json({
-                    "type": "STREAM_TOKEN",
-                    "path": path,
-                    "token": token
-                })
-
-            save_file(workspace_id, path, content)
-            await ws.send_json({"type": "FILE_DONE", "path": path})
-
-        # Step 3: Patch App.jsx
-        original = read_file(workspace_id, "src/App.jsx")
-        updated = inject_routes(original, plan["routes"])
-        save_file(workspace_id, "src/App.jsx", updated)
-
-        await ws.send_json({
-            "type": "FILE_UPDATE",
-            "path": "src/App.jsx",
-            "content": updated
-        })
-
-        await ws.send_json({"type": "GENERATION_DONE"})
-
-    except WebSocketDisconnect:
-        pass  # Client disconnected — clean up if needed
-    except Exception as e:
-        await ws.send_json({"type": "ERROR", "message": str(e)})
-```
-
-#### Step 2.3 — Frontend: WebSocket Hook
+### 3.2 MongoDB Indexes
 
 ```javascript
-// frontend/src/hooks/useGenerationWS.js
-
-import { useEffect, useRef } from 'react'
-import { useWorkspaceStore } from '../store/workspaceStore'
-
-export function useGenerationWS(workspaceId) {
-  const ws = useRef(null)
-  const { addFile, appendToken, updateFile, setStatus } = useWorkspaceStore()
-
-  const startGeneration = (idea) => {
-    const url = `ws://${window.location.host}/ws/generate/${workspaceId}`
-    ws.current = new WebSocket(url)
-
-    ws.current.onopen = () => {
-      ws.current.send(idea)
-      setStatus('generating')
-    }
-
-    ws.current.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-
-      switch (data.type) {
-        case 'FILE_CREATE':
-          addFile(data.path, '')
-          break
-        case 'STREAM_TOKEN':
-          appendToken(data.path, data.token)
-          break
-        case 'FILE_UPDATE':
-          updateFile(data.path, data.content)
-          break
-        case 'GENERATION_DONE':
-          setStatus('done')
-          ws.current.close()
-          break
-        case 'ERROR':
-          setStatus('error')
-          console.error(data.message)
-          break
-      }
-    }
-
-    ws.current.onerror = () => setStatus('error')
-  }
-
-  // Cleanup on unmount
-  useEffect(() => () => ws.current?.close(), [])
-
-  return { startGeneration }
-}
+// Run once on startup / migration
+db.repo_baselines.createIndex({ "repo_id": 1 }, { unique: true })
+db.repo_baselines.createIndex({ "github_url": 1 })
+db.repo_baselines.createIndex({ "tests.test_id": 1 })
+db.repo_baselines.createIndex({ "tests.added_in_session": 1 })
+db.repo_baselines.createIndex({ "sessions.session_id": 1 })
 ```
-
-**Deliverable:** Code streams token-by-token into Monaco. File tree updates live.
 
 ---
 
-### Phase 3 — Planner Agent (Days 7–9)
+## 4. How Test Categories Are Decided
 
-**Goal:** LLM intelligently decides what files to create and what to modify.
+**This is not hardcoded.** The AI analyses the actual code and assigns the most accurate category. Here is the logic the AI uses:
 
-#### Step 3.1 — Planner Prompt
+| What the AI sees | Category assigned |
+|---|---|
+| `LoginForm`, `useAuth`, `/auth/*` routes | `auth` |
+| `fetch('/api/...')`, route handlers, controllers | `api` |
+| `<form>`, `handleSubmit`, input validation | `ui_form` |
+| `<Link>`, `router.push`, nav components | `ui_navigation` |
+| Standalone UI components (buttons, modals, tables) | `ui_component` |
+| `create`, `read`, `update`, `delete` operations | `crud` |
+| Multiple services talking to each other | `integration` |
+| Null checks, empty states, 404 handling | `edge_case` |
+| `loading`, `skeleton`, debounce | `performance` |
+| `aria-*`, role attributes, keyboard nav | `accessibility` |
+
+The AI is instructed: _"Read the code and assign the most precise category from the enum. Do not default to 'ui' for everything. A login form is 'auth'. A data grid is 'ui_component'. A checkout flow touching payments API is 'integration'."_
+
+---
+
+## 5. Backend Architecture
+
+### 5.1 Services Breakdown
+
+```
+services/
+  repo_service.py       — clone, read files, extract structure
+  ai_service.py         — all AI calls
+  diff_service.py       — detect what actually changed vs baseline
+  test_store.py         — all MongoDB read/write logic
+  session_service.py    — track scan runs
+```
+
+### 5.2 repo_service.py — What We Extract
 
 ```python
-# backend/engines/planner.py
+# services/repo_service.py
+import subprocess, os, hashlib
+from pathlib import Path
+from dataclasses import dataclass
+from typing import List, Dict
 
-import json
-from utils.llm import claude_complete
+SUPPORTED_EXTENSIONS = {'.ts', '.tsx', '.js', '.jsx', '.py', '.vue', '.svelte'}
+SKIP_DIRS = {'node_modules', '.git', 'dist', 'build', '.next', '__pycache__', 'coverage'}
 
-PLANNER_PROMPT = """
-You are a React project planner. Given a user idea, output a JSON plan.
+@dataclass
+class ExtractedFile:
+    path: str
+    content: str
+    language: str
+    size_tokens: int  # rough estimate: len(content) // 4
 
-Template already contains:
-- src/App.jsx (with route injection markers)
-- src/main.jsx
-- src/pages/ (empty)
-- src/components/ (empty)
+@dataclass
+class RepoSnapshot:
+    github_url: str
+    commit_sha: str
+    files: List[ExtractedFile]
+    routes: List[str]          # detected URL paths
+    components: List[str]      # detected component names
+    api_endpoints: List[str]   # detected API routes
 
-User idea: {idea}
+def get_repo_id(github_url: str) -> str:
+    normalised = github_url.lower().rstrip('/').replace('.git', '')
+    return hashlib.sha256(normalised.encode()).hexdigest()[:16]
 
-Return ONLY valid JSON with this exact shape:
+async def fetch_repo(github_url: str, token: str = None) -> RepoSnapshot:
+    """
+    Clone repo to temp dir, extract meaningful files.
+    Cap at 200 files. Skip binary, skip large files > 50KB.
+    """
+    ...
+
+def chunk_files_for_ai(files: List[ExtractedFile], max_tokens: int = 80000) -> List[List[ExtractedFile]]:
+    """
+    Split files into chunks that fit within AI context window.
+    Prioritise: route files > component files > utility files > config files
+    """
+    ...
+```
+
+### 5.3 diff_service.py — The Core Intelligence
+
+```python
+# services/diff_service.py
+"""
+When the same repo is submitted again, we need to know:
+1. Which files changed since last scan
+2. Which existing tests cover those files
+3. What new tests the AI should generate (only for changed areas)
+
+Strategy:
+- Compare current commit SHA with stored last_commit_sha
+- If same SHA: skip (no changes, return 0 new tests)
+- If different: use git diff to get changed files
+- If no git access: compare file content hashes stored in session
+"""
+
+from typing import List, Tuple
+from models.repo import PlaywrightTest, RepoBaseline
+
+def get_changed_files(old_sha: str, new_sha: str, repo_path: str) -> List[str]:
+    """Returns list of file paths that changed between two commits."""
+    result = subprocess.run(
+        ['git', 'diff', '--name-only', old_sha, new_sha],
+        cwd=repo_path, capture_output=True, text=True
+    )
+    return [f.strip() for f in result.stdout.splitlines() if f.strip()]
+
+def find_related_tests(
+    changed_files: List[str], 
+    existing_tests: List[PlaywrightTest]
+) -> List[PlaywrightTest]:
+    """
+    For each changed file, find tests that reference it via source_file.
+    These are the tests the AI should know about to avoid duplication.
+    """
+    related = []
+    changed_set = set(changed_files)
+    for test in existing_tests:
+        if test.source_file and test.source_file in changed_set:
+            related.append(test)
+    return related
+
+def deduplicate_tests(
+    new_candidates: List[PlaywrightTest],
+    existing_tests: List[PlaywrightTest]
+) -> List[PlaywrightTest]:
+    """
+    Final dedup pass after AI returns new tests.
+    Compare by: name similarity > 0.85 using SequenceMatcher
+    Also compare endpoint + page_path combination.
+    """
+    from difflib import SequenceMatcher
+    truly_new = []
+    existing_names = [t.name.lower() for t in existing_tests]
+    
+    for candidate in new_candidates:
+        cname = candidate.name.lower()
+        is_duplicate = False
+        for ename in existing_names:
+            ratio = SequenceMatcher(None, cname, ename).ratio()
+            if ratio > 0.85:
+                is_duplicate = True
+                break
+        if not is_duplicate:
+            truly_new.append(candidate)
+    return truly_new
+```
+
+### 5.4 ai_service.py — Two Modes
+
+```python
+# services/ai_service.py
+import anthropic, json
+from typing import List
+from models.repo import PlaywrightTest, TestCategory
+
+client = anthropic.Anthropic()
+
+SYSTEM_PROMPT = """
+You are a senior QA engineer who writes production-grade Playwright test cases.
+
+RULES:
+1. Analyse the actual code provided. Do not generate generic tests.
+2. Assign category from this exact list: auth, api, ui_form, ui_navigation, 
+   ui_component, crud, integration, edge_case, performance, accessibility
+3. For every test, set page_path to the actual route (e.g. /dashboard/users)
+   or component_name to the actual component (e.g. UserEditModal)
+4. For API tests, set endpoint to the method + path (e.g. POST /api/orders)
+5. severity: critical = auth/payment flows, high = core CRUD, medium = UI flows, low = edge cases
+6. playwright_code must be valid, runnable Playwright TypeScript code
+7. Return ONLY valid JSON. No markdown. No explanation.
+"""
+
+FULL_SCAN_PROMPT = """
+Analyse this codebase and generate comprehensive Playwright test cases.
+
+CODEBASE:
+{code_chunks}
+
+Generate between 30-60 test cases covering all significant functionality.
+Ensure good distribution across categories based on what the code actually does.
+
+Return JSON with this exact structure:
 {{
-  "files": [
+  "tests": [
     {{
-      "path": "src/pages/BiologyDashboard.jsx",
-      "description": "Biology dashboard with charts",
-      "imports": ["recharts", "useState"]
-    }}
-  ],
-  "routes": [
-    {{
-      "path": "/biology",
-      "component": "BiologyDashboard",
-      "importPath": "./pages/BiologyDashboard"
+      "name": "string",
+      "description": "string", 
+      "category": "one of the enum values",
+      "page_path": "string or null",
+      "component_name": "string or null",
+      "endpoint": "string or null",
+      "severity": "critical|high|medium|low",
+      "source_file": "relative file path this test is based on",
+      "steps": [
+        {{"action": "navigate|click|fill|expect|wait", "target": "string", "value": "string or null", "assertion": "string or null"}}
+      ],
+      "playwright_code": "full playwright test code as string"
     }}
   ]
 }}
 """
 
-async def plan_files(idea: str) -> dict:
-    raw = await claude_complete(PLANNER_PROMPT.format(idea=idea))
-    return json.loads(raw)
-```
+INCREMENTAL_PROMPT = """
+Analyse ONLY the changed files below and generate new Playwright test cases.
 
-#### Step 3.2 — LLM Wrapper with Streaming
+CHANGED FILES:
+{changed_code}
 
-```python
-# backend/utils/llm.py
+EXISTING TESTS ALREADY IN DATABASE (do NOT duplicate these):
+{existing_tests_summary}
 
-import anthropic
-from typing import AsyncGenerator
+TASK:
+- Generate test cases ONLY for the new/changed logic in the files above
+- Do NOT regenerate anything already covered by the existing tests list
+- If a change is minor (typo fix, style change), return empty tests array
+- Focus on: new functions, new routes, new components, changed business logic
 
-client = anthropic.AsyncAnthropic()
-
-async def claude_stream(prompt: str) -> AsyncGenerator[str, None]:
-    async with client.messages.stream(
-        model="claude-opus-4-5",
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}]
-    ) as stream:
-        async for text in stream.text_stream:
-            yield text
-
-async def claude_complete(prompt: str) -> str:
-    result = ""
-    async for token in claude_stream(prompt):
-        result += token
-    return result
-```
-
----
-
-### Phase 4 — Code Injection Engine (Days 10–12)
-
-**Goal:** Safely patch App.jsx routes without rewriting the whole file.
-
-#### Step 4.1 — Template Markers (Simple, Production-Safe)
-
-Add these comments to your base `App.jsx` template. They are the injection targets.
-
-```jsx
-// src/App.jsx (base template)
-
-import React from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-
-// AUTO_IMPORTS_START
-// AUTO_IMPORTS_END
-
-export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<div>Home</div>} />
-        {/* AUTO_ROUTES_START */}
-        {/* AUTO_ROUTES_END */}
-      </Routes>
-    </BrowserRouter>
-  )
-}
-```
-
-#### Step 4.2 — Injection Engine
-
-```python
-# backend/engines/injector.py
-
-import re
-
-def inject_routes(app_jsx: str, routes: list[dict]) -> str:
-    """
-    Safely inject imports and route entries between marker comments.
-    Never overwrites anything outside the markers.
-    """
-
-    # Build import block
-    import_lines = "\n".join(
-        f"import {r['component']} from '{r['importPath']}'"
-        for r in routes
-    )
-
-    # Build route block
-    route_lines = "\n        ".join(
-        f'<Route path="{r["path"]}" element={{<{r["component"]} />}} />'
-        for r in routes
-    )
-
-    # Inject imports
-    app_jsx = re.sub(
-        r'// AUTO_IMPORTS_START.*?// AUTO_IMPORTS_END',
-        f'// AUTO_IMPORTS_START\n{import_lines}\n// AUTO_IMPORTS_END',
-        app_jsx,
-        flags=re.DOTALL
-    )
-
-    # Inject routes
-    app_jsx = re.sub(
-        r'\{/\* AUTO_ROUTES_START \*/\}.*?\{/\* AUTO_ROUTES_END \*/\}',
-        f'{{/* AUTO_ROUTES_START */}}\n        {route_lines}\n        {{/* AUTO_ROUTES_END */}}',
-        app_jsx,
-        flags=re.DOTALL
-    )
-
-    return app_jsx
-```
-
-**Why this is safe:** Only content between markers is replaced. No AST needed at this stage.
-
----
-
-### Phase 5 — Preview Panel (Days 13–15)
-
-**Goal:** User sees a live running preview of their generated app.
-
-#### Option A — Sandpack (Recommended for MVP)
-
-Sandpack runs React entirely in the browser. No backend server needed.
-
-```jsx
-// frontend/src/components/Preview.jsx
-
-import { Sandpack } from '@codesandbox/sandpack-react'
-import { useWorkspaceStore } from '../store/workspaceStore'
-
-export default function Preview() {
-  const files = useWorkspaceStore(s => s.files)
-
-  // Convert store format to Sandpack format
-  const sandpackFiles = Object.fromEntries(
-    Object.entries(files).map(([path, content]) => [
-      `/${path}`,
-      { code: content }
-    ])
-  )
-
-  return (
-    <Sandpack
-      template="react"
-      files={sandpackFiles}
-      options={{ showPreview: true, showNavigator: true }}
-    />
-  )
-}
-```
-
-#### Option B — Dev Server in Container (Full Fidelity)
-
-For full npm support, run each workspace in a container with a dev server exposed on a random port, and embed it in an iframe.
-
----
-
-## 6. Backend Deep Dive
-
-### FastAPI App Entry
-
-```python
-# backend/main.py
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from routers import workspace, generate
-
-app = FastAPI(title="AI IDE Backend")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite dev server
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
-
-app.include_router(workspace.router)
-app.include_router(generate.router)
-```
-
-### File System Utility
-
-```python
-# backend/utils/fs.py
-
-import os, json
-
-WORKSPACES_DIR = "workspaces"
-
-def save_file(workspace_id: str, path: str, content: str):
-    full_path = os.path.join(WORKSPACES_DIR, workspace_id, path)
-    os.makedirs(os.path.dirname(full_path), exist_ok=True)
-    with open(full_path, "w") as f:
-        f.write(content)
-
-def read_file(workspace_id: str, path: str) -> str:
-    full_path = os.path.join(WORKSPACES_DIR, workspace_id, path)
-    with open(full_path) as f:
-        return f.read()
-
-def list_files(workspace_id: str) -> dict:
-    root = os.path.join(WORKSPACES_DIR, workspace_id)
-    result = {}
-    for dirpath, _, filenames in os.walk(root):
-        for fname in filenames:
-            full = os.path.join(dirpath, fname)
-            rel = os.path.relpath(full, root)
-            with open(full) as f:
-                result[rel] = f.read()
-    return result
-```
-
----
-
-## 7. Frontend Deep Dive
-
-### Zustand Store
-
-```javascript
-// frontend/src/store/workspaceStore.js
-
-import { create } from 'zustand'
-
-export const useWorkspaceStore = create((set) => ({
-  workspaceId: null,
-  files: {},           // { "src/App.jsx": "...", ... }
-  activeFile: null,
-  status: 'idle',      // idle | generating | done | error
-
-  setWorkspace: (id) => set({ workspaceId: id }),
-
-  addFile: (path, content = '') =>
-    set(s => ({ files: { ...s.files, [path]: content }, activeFile: path })),
-
-  appendToken: (path, token) =>
-    set(s => ({
-      files: {
-        ...s.files,
-        [path]: (s.files[path] || '') + token
-      }
-    })),
-
-  updateFile: (path, content) =>
-    set(s => ({ files: { ...s.files, [path]: content } })),
-
-  setActiveFile: (path) => set({ activeFile: path }),
-
-  setStatus: (status) => set({ status }),
-}))
-```
-
-### Monaco Editor Wrapper
-
-```jsx
-// frontend/src/components/CodeEditor.jsx
-
-import Editor from '@monaco-editor/react'
-import { useWorkspaceStore } from '../store/workspaceStore'
-
-export default function CodeEditor() {
-  const activeFile = useWorkspaceStore(s => s.activeFile)
-  const files = useWorkspaceStore(s => s.files)
-  const updateFile = useWorkspaceStore(s => s.updateFile)
-
-  const language = activeFile?.endsWith('.jsx') ? 'javascript'
-    : activeFile?.endsWith('.css') ? 'css'
-    : 'javascript'
-
-  return (
-    <Editor
-      height="100%"
-      language={language}
-      value={files[activeFile] || ''}
-      onChange={(val) => updateFile(activeFile, val)}
-      theme="vs-dark"
-      options={{
-        minimap: { enabled: false },
-        fontSize: 14,
-        wordWrap: 'on',
-        scrollBeyondLastLine: false,
-      }}
-    />
-  )
-}
-```
-
----
-
-## 8. Streaming Engine
-
-### Generator Prompt Per File
-
-```python
-# backend/engines/generator.py
-
-from utils.llm import claude_stream
-from typing import AsyncGenerator
-
-FILE_PROMPT = """
-You are generating a React component file.
-
-Project context:
-- React 18 + Vite
-- Tailwind CSS for styling
-- React Router v6 already installed
-- Available packages: recharts, lucide-react
-
-File to generate: {path}
-Description: {description}
-Required imports: {imports}
-
-Rules:
-- Output ONLY the file content. No explanation, no markdown, no backticks.
-- Use functional components with hooks.
-- Include a default export.
-- Use Tailwind classes for all styling.
-- Make it visually complete and functional.
+Return same JSON structure as a full scan. Return {{"tests": []}} if nothing genuinely new.
 """
 
-async def stream_file(file_spec: dict) -> AsyncGenerator[str, None]:
-    prompt = FILE_PROMPT.format(
-        path=file_spec["path"],
-        description=file_spec["description"],
-        imports=", ".join(file_spec.get("imports", []))
+async def generate_full_scan_tests(code_chunks: List[str]) -> List[dict]:
+    combined = "\n\n---FILE BOUNDARY---\n\n".join(code_chunks)
+    
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=8000,
+        system=SYSTEM_PROMPT,
+        messages=[{
+            "role": "user", 
+            "content": FULL_SCAN_PROMPT.format(code_chunks=combined)
+        }]
     )
-    async for token in claude_stream(prompt):
-        yield token
+    
+    raw = response.content[0].text
+    parsed = json.loads(raw)
+    return parsed.get("tests", [])
+
+async def generate_incremental_tests(
+    changed_code: str,
+    existing_tests: List[PlaywrightTest]
+) -> List[dict]:
+    # Summarise existing tests to save tokens
+    # Send name + category + page_path only, not full playwright code
+    summary = [
+        {
+            "name": t.name, 
+            "category": t.category, 
+            "page_path": t.page_path,
+            "endpoint": t.endpoint
+        } 
+        for t in existing_tests
+    ]
+    
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=6000,
+        system=SYSTEM_PROMPT,
+        messages=[{
+            "role": "user",
+            "content": INCREMENTAL_PROMPT.format(
+                changed_code=changed_code,
+                existing_tests_summary=json.dumps(summary, indent=2)
+            )
+        }]
+    )
+    
+    raw = response.content[0].text
+    parsed = json.loads(raw)
+    return parsed.get("tests", [])
 ```
 
 ---
 
-## 9. Code Injection Engine
+## 6. AI Prompt Strategy
 
-### Upgrade Path: Marker → AST
+### Key principles that prevent bad output:
 
-| Stage | Method | Complexity | Safety |
-|-------|--------|------------|--------|
-| MVP | Regex + Markers | Low | High (contained) |
-| V2 | `recast` JS AST | Medium | Very High |
-| V3 | Babel Transform | High | Highest |
+**1. No generic tests** — We pass actual file content, not just filenames. AI reads real code.
 
-### Marker Strategy (Production MVP)
+**2. Token budget management:**
+- Full scan: send files in priority order (routes first), cap at 80K tokens
+- Incremental: send only changed files + test name summaries (not full test code)
 
-The marker approach is safe because:
-- Only content between `// AUTO_*_START` and `// AUTO_*_END` is touched
-- Template structure is never broken
-- Works deterministically with no edge cases
+**3. Structured output with validation:**
+```python
+# After AI returns, validate every test
+def validate_ai_test(raw: dict) -> Optional[PlaywrightTest]:
+    try:
+        # Must have name
+        if not raw.get("name"):
+            return None
+        # Category must be valid enum value
+        if raw.get("category") not in [c.value for c in TestCategory]:
+            raw["category"] = "ui_component"  # safe fallback, not crash
+        # Must have at least 1 step
+        if not raw.get("steps"):
+            return None
+        return PlaywrightTest(**raw)
+    except Exception:
+        return None  # skip malformed, don't crash the whole run
+```
 
-Always include markers in the base template. Never remove them after injection — re-injection must be idempotent.
+**4. Retry on parse failure:**
+```python
+for attempt in range(3):
+    try:
+        result = json.loads(response_text)
+        break
+    except json.JSONDecodeError:
+        if attempt == 2:
+            raise
+        # Ask AI to fix its own output
+        response_text = fix_json_response(response_text)
+```
 
 ---
 
-## 10. LLM Prompt Strategy
+## 7. Frontend Architecture
 
-### Two-Call Pattern (Critical for Quality)
-
-**Call 1 — Plan (JSON, fast, non-streamed):**
-Get structured metadata about what to build.
-
-**Call 2 — Generate (streamed, per file):**
-Generate actual code for each file with full context.
-
-### System Prompt for Generator
+### 7.1 Pages
 
 ```
-You are an expert React developer generating production-quality code.
-- Always output raw code only. No markdown. No explanation.
-- Files must be self-contained and immediately runnable.
-- Use only packages already declared in package.json.
-- Follow the existing project conventions strictly.
+/                           — Landing, submit repo URL form
+/repo/[repo_id]             — Main dashboard for a repo
+/repo/[repo_id]/session/[session_id]  — Specific scan session results
 ```
 
-### Avoiding LLM Hallucinations
+### 7.2 Main Dashboard Component Tree
 
-- Always pass the full `package.json` dependencies list in the prompt
-- Always specify the exact import path style (`./pages/X` not `../pages/X`)
-- Cap token output per file to 1500 tokens to prevent runaway generation
-- Validate generated JSX by attempting a parse before saving to disk
+```
+RepoPage
+  ├── RepoHeader (url, last scan time, total test count)
+  ├── SessionSelector (dropdown: "Run #4 — 3 new tests" etc)
+  │
+  ├── [if viewing a non-first session]
+  │   └── NewTestsBanner ("✦ 6 new tests added in this run")
+  │       └── NewTestsList (highlighted cards with NEW badge)
+  │
+  ├── TestCategoryTabs (auto-generated from what categories exist)
+  │   ├── Tab: "Auth (8)"
+  │   ├── Tab: "API (12)"
+  │   ├── Tab: "UI Form (6)"
+  │   └── Tab: "CRUD (9)"  ...etc
+  │
+  └── TestGrid
+      ├── GroupHeader (page_path or component_name)
+      │   └── TestCard (expandable)
+      │       ├── Badge: category
+      │       ├── Badge: severity  
+      │       ├── Badge: NEW (if added_in_session == current session)
+      │       ├── Description
+      │       ├── Steps list
+      │       └── [Expand] Playwright code viewer
+```
 
----
+### 7.3 TestCard Component
 
-## 11. State Management
+```tsx
+// components/TestCard.tsx
+interface TestCardProps {
+  test: PlaywrightTest
+  isNew: boolean  // true if added in the currently viewed session
+}
 
-### State Shape
-
-```typescript
-interface WorkspaceState {
-  workspaceId: string | null
-  files: Record<string, string>     // path → full content
-  activeFile: string | null
-  status: 'idle' | 'generating' | 'done' | 'error'
-  generationLog: string[]           // human-readable status messages
+export function TestCard({ test, isNew }: TestCardProps) {
+  const [expanded, setExpanded] = useState(false)
+  
+  return (
+    <div className={cn(
+      "rounded-xl border p-4 transition-all",
+      isNew 
+        ? "border-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-sm shadow-emerald-200" 
+        : "border-border bg-card"
+    )}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap gap-2 items-center">
+          {isNew && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full 
+                           bg-emerald-500 text-white tracking-wide">
+              NEW
+            </span>
+          )}
+          <CategoryBadge category={test.category} />
+          <SeverityBadge severity={test.severity} />
+        </div>
+        <button onClick={() => setExpanded(!expanded)} className="text-muted-foreground">
+          {expanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+        </button>
+      </div>
+      
+      <h3 className="font-medium mt-3 text-sm">{test.name}</h3>
+      <p className="text-xs text-muted-foreground mt-1">{test.description}</p>
+      
+      {(test.page_path || test.endpoint) && (
+        <code className="text-xs bg-muted px-2 py-0.5 rounded mt-2 inline-block">
+          {test.page_path || test.endpoint}
+        </code>
+      )}
+      
+      {expanded && (
+        <div className="mt-4 space-y-3">
+          <StepsList steps={test.steps} />
+          <PlaywrightCodeViewer code={test.playwright_code} />
+        </div>
+      )}
+    </div>
+  )
 }
 ```
 
-### Key Rules
+### 7.4 New Tests Banner
 
-- `appendToken` must be fast — it fires on every token (~50ms intervals)
-- Monaco does NOT re-render on every token. Set value through a ref, not state directly for performance
-- Use `immer` middleware if state updates cause slowness on large files
+```tsx
+// components/NewTestsBanner.tsx
+// Shown at top of page when viewing a session that added tests
 
-### Performance Optimization for Token Streaming
-
-```javascript
-// Batch token updates every 50ms instead of on every token
-// This prevents React re-render storms
-
-let buffer = ''
-let flushTimer = null
-
-ws.current.onmessage = (event) => {
-  const data = JSON.parse(event.data)
-
-  if (data.type === 'STREAM_TOKEN') {
-    buffer += data.token
-    if (!flushTimer) {
-      flushTimer = setTimeout(() => {
-        appendToken(data.path, buffer)
-        buffer = ''
-        flushTimer = null
-      }, 50) // Flush every 50ms
-    }
-  }
+export function NewTestsBanner({ session, newTests }: Props) {
+  if (!session || session.tests_added === 0) return null
+  
+  return (
+    <div className="rounded-xl border border-emerald-300 bg-emerald-50 
+                    dark:bg-emerald-950/30 p-4 mb-6">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center 
+                        justify-center text-white text-sm font-bold">
+          +{session.tests_added}
+        </div>
+        <div>
+          <p className="font-semibold text-emerald-900 dark:text-emerald-100">
+            {session.tests_added} new test{session.tests_added !== 1 ? 's' : ''} added
+          </p>
+          <p className="text-xs text-emerald-700 dark:text-emerald-300">
+            {session.scan_type === 'full' ? 'Full scan' : `Changes in ${session.changed_files.length} file(s)`}
+            {' '}· {formatRelativeTime(session.triggered_at)}
+          </p>
+        </div>
+      </div>
+      
+      {/* Quick breakdown by category */}
+      <div className="flex flex-wrap gap-2 mt-3">
+        {getCategoryBreakdown(newTests).map(({ category, count }) => (
+          <span key={category} className="text-xs px-2 py-1 rounded-full 
+                                          bg-emerald-100 text-emerald-800">
+            {category}: +{count}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 }
 ```
 
 ---
 
-## 12. Template System
+## 8. Step-by-Step Implementation
 
-### Base Template Structure
-
-```
-templates/react-base/
-├── package.json           # All deps pre-declared
-├── vite.config.js
-├── index.html
-├── tailwind.config.js
-└── src/
-    ├── main.jsx
-    ├── App.jsx            # Contains injection markers
-    ├── index.css          # Tailwind directives
-    ├── pages/             # Empty — LLM fills this
-    └── components/        # Empty — LLM fills this
-```
-
-### `package.json` (pre-declare all likely deps)
-
-```json
-{
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0",
-    "recharts": "^2.10.0",
-    "lucide-react": "^0.300.0",
-    "clsx": "^2.0.0"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.0",
-    "tailwindcss": "^3.3.0",
-    "autoprefixer": "^10.4.0",
-    "postcss": "^8.4.0",
-    "vite": "^5.0.0"
-  }
-}
-```
-
-Pre-declaring deps prevents LLM from importing packages that don't exist in the project.
-
----
-
-## 13. Security & Production Hardening
-
-### WebSocket Security
-
-```python
-# Always validate workspace ownership before accepting WS connection
-@router.websocket("/ws/generate/{workspace_id}")
-async def generate(ws: WebSocket, workspace_id: str, token: str = Query(...)):
-    user = verify_token(token)
-    if not owns_workspace(user, workspace_id):
-        await ws.close(code=4003)
-        return
-    await ws.accept()
-    # ...
-```
-
-### File System Isolation
-
-```python
-# Path traversal prevention — CRITICAL
-import os
-
-def safe_path(workspace_id: str, relative_path: str) -> str:
-    base = os.path.realpath(os.path.join(WORKSPACES_DIR, workspace_id))
-    full = os.path.realpath(os.path.join(base, relative_path))
-    if not full.startswith(base):
-        raise ValueError("Path traversal detected")
-    return full
-```
-
-### Rate Limiting
-
-```python
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
-limiter = Limiter(key_func=get_remote_address)
-
-@router.post("/workspace/create")
-@limiter.limit("10/minute")
-async def create(request: Request):
-    ...
-```
-
-### LLM Output Sanitization
-
-- Never execute LLM-generated code on the server
-- Validate generated JSX is parseable before writing to disk
-- Use `esprima` or `acorn` to parse and reject files with syntax errors
-
----
-
-## 14. Deployment Strategy
-
-### Docker Compose (Development)
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./workspaces:/app/workspaces
-    environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_WS_URL=ws://localhost:8000
-```
-
-### Production: Fly.io (WebSocket-Native)
-
-Fly.io natively supports WebSocket connections. Recommended over Heroku or AWS Lambda (which require sticky sessions or API Gateway workarounds).
-
-```toml
-# fly.toml
-app = "ai-ide-backend"
-
-[build]
-  dockerfile = "Dockerfile"
-
-[http_service]
-  internal_port = 8000
-  force_https = true
-
-[[vm]]
-  memory = "1gb"
-  cpu_kind = "shared"
-  cpus = 1
-```
-
-### Frontend: Vercel
-
-```bash
-cd frontend
-vercel --prod
-```
-
-Set env var: `VITE_WS_URL=wss://ai-ide-backend.fly.dev`
-
----
-
-## 15. Known Blockers & How to Avoid Them
-
-| Blocker | Root Cause | Fix |
-|---------|------------|-----|
-| WebSocket drops on load balancers | LBs close idle connections | Send a ping every 25s from client |
-| Monaco re-renders freeze browser | State update on every token | Batch tokens every 50ms (see §11) |
-| LLM imports non-existent packages | No package context in prompt | Always include `package.json` deps in generator prompt |
-| Path traversal in workspace FS | Unvalidated user path input | Use `safe_path()` with `realpath` check |
-| App.jsx overwritten on re-generate | Injector not idempotent | Re-read current App.jsx before each inject, only add missing routes |
-| CORS blocks WebSocket in prod | Missing WS in CORS config | FastAPI CORS middleware does not apply to WS — handle at nginx/proxy level |
-| Large file generation cuts off | LLM max token limit | Split large components into sub-components in the planner step |
-| Preview out of sync | Sandpack doesn't auto-update | Pass `files` prop reactively; Sandpack re-renders on prop change |
-
----
-
-## Quick Start Commands
+### Step 1 — Project Scaffolding (Day 1)
 
 ```bash
 # Backend
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+mkdir testgen-api && cd testgen-api
+python -m venv venv && source venv/bin/activate
+pip install fastapi uvicorn motor anthropic gitpython pydantic python-dotenv celery redis
 
-# Frontend
-cd frontend
-npm install
-npm run dev
+# Frontend  
+npx create-next-app@latest testgen-ui --typescript --tailwind --app
+cd testgen-ui
+npx shadcn-ui@latest init
+npm install zustand @radix-ui/react-tabs react-syntax-highlighter lucide-react
 
-# Test WebSocket manually
-wscat -c "ws://localhost:8000/ws/generate/test-workspace-id"
-# Then type: create a biology dashboard with charts
+# MongoDB
+# Use Atlas free tier or: docker run -d -p 27017:27017 mongo:7
+```
+
+### Step 2 — Data Layer (Day 1–2)
+
+- Write `models/repo.py` (from Section 3 above — copy exactly)
+- Write `db/mongo.py` — connection + CRUD helpers
+- Write `db/migrations.py` — create indexes on startup
+- Test: insert a dummy RepoBaseline, query it back
+
+```python
+# db/mongo.py
+from motor.motor_asyncio import AsyncIOMotorClient
+from models.repo import RepoBaseline
+import os
+
+client = AsyncIOMotorClient(os.getenv("MONGO_URI"))
+db = client.testgen
+
+async def get_repo(repo_id: str) -> RepoBaseline | None:
+    doc = await db.repo_baselines.find_one({"repo_id": repo_id})
+    return RepoBaseline(**doc) if doc else None
+
+async def upsert_repo(baseline: RepoBaseline):
+    await db.repo_baselines.update_one(
+        {"repo_id": baseline.repo_id},
+        {"$set": baseline.model_dump()},
+        upsert=True
+    )
+
+async def append_tests_and_session(repo_id: str, new_tests: list, session: dict):
+    await db.repo_baselines.update_one(
+        {"repo_id": repo_id},
+        {
+            "$push": {
+                "tests": {"$each": [t.model_dump() for t in new_tests]},
+                "sessions": session
+            },
+            "$set": {"updated_at": datetime.utcnow()}
+        }
+    )
+```
+
+### Step 3 — Repo Fetcher (Day 2)
+
+- Clone repo to `/tmp/repos/{repo_id}/`
+- Read all source files matching `SUPPORTED_EXTENSIONS`
+- Skip `SKIP_DIRS`
+- Cap individual files at 50KB
+- Return `RepoSnapshot`
+- Store latest commit SHA
+
+### Step 4 — AI Service (Day 3)
+
+- Implement `generate_full_scan_tests()` from Section 5.4
+- Implement `generate_incremental_tests()` from Section 5.4
+- Implement `validate_ai_test()` — never let bad AI output crash the run
+- Write a local test: pass a 3-file sample, assert you get back valid JSON
+
+### Step 5 — Diff Detection (Day 3–4)
+
+- Implement `get_changed_files()` using `git diff`
+- Fallback: if no git history, hash each file content and compare with stored hashes
+- Implement `deduplicate_tests()` — the final safety net
+- Write unit tests: same test submitted twice should return 0 new tests
+
+### Step 6 — API Routes (Day 4)
+
+```python
+# routes/repos.py
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+router = APIRouter(prefix="/api/repos")
+
+@router.post("/scan")
+async def scan_repo(payload: ScanRequest, bg: BackgroundTasks):
+    """
+    Single endpoint handles both first scan and re-scans.
+    Backend detects which it is automatically.
+    """
+    repo_id = get_repo_id(payload.github_url)
+    existing = await get_repo(repo_id)
+    
+    session = ScanSession(
+        github_url=payload.github_url,
+        scan_type="full" if not existing else "incremental"
+    )
+    
+    # Async: return session_id immediately, process in background
+    bg.add_task(run_scan, repo_id, payload.github_url, session, existing)
+    
+    return {"session_id": session.session_id, "repo_id": repo_id, "status": "queued"}
+
+@router.get("/status/{session_id}")
+async def get_session_status(session_id: str):
+    """Frontend polls this every 3s until status == done"""
+    ...
+
+@router.get("/{repo_id}")
+async def get_repo_tests(repo_id: str, session_id: str = None):
+    """
+    Returns all tests + session list.
+    If session_id given, also returns which tests are new for that session.
+    """
+    ...
+```
+
+### Step 7 — Frontend: Repo Submission Page (Day 5)
+
+- Text input for GitHub URL
+- Submit → POST `/api/repos/scan` → get `session_id`
+- Poll `/api/repos/status/{session_id}` every 3s
+- Show progress: "Cloning... Analysing... Generating tests... Done"
+- On done → redirect to `/repo/{repo_id}?session={session_id}`
+
+### Step 8 — Frontend: Tests Dashboard (Day 5–6)
+
+- Fetch all tests for repo
+- Auto-generate tabs from unique categories in the data (not hardcoded)
+- Group within each tab by `page_path` or `component_name`
+- Mark tests where `added_in_session === session_id` as NEW
+- Render `NewTestsBanner` if session has new tests
+- Implement `TestCard` with collapsible Playwright code
+
+### Step 9 — Polish & Edge Cases (Day 7)
+
+- Loading skeletons during scan
+- Error states (private repo, invalid URL, AI timeout)
+- Session history sidebar ("Run #1 · 45 tests · 3 days ago")
+- Copy test code button
+- Filter by severity
+- Search across test names
+
+---
+
+## 9. API Contract
+
+### POST /api/repos/scan
+
+**Request:**
+```json
+{
+  "github_url": "https://github.com/user/repo",
+  "github_token": "optional, for private repos"
+}
+```
+
+**Response (immediate):**
+```json
+{
+  "session_id": "a3f9c2d1",
+  "repo_id": "7b4e9a12",
+  "scan_type": "full",
+  "status": "queued"
+}
+```
+
+### GET /api/repos/status/{session_id}
+
+**Response:**
+```json
+{
+  "session_id": "a3f9c2d1",
+  "status": "running",
+  "progress": "Generating test cases... (42/~60)",
+  "tests_added": 0
+}
+```
+
+**When done:**
+```json
+{
+  "status": "done",
+  "tests_added": 47,
+  "tests_total": 47,
+  "scan_type": "full",
+  "repo_id": "7b4e9a12"
+}
+```
+
+### GET /api/repos/{repo_id}?session_id={session_id}
+
+**Response:**
+```json
+{
+  "repo_id": "7b4e9a12",
+  "github_url": "https://github.com/user/repo",
+  "total_tests": 53,
+  "sessions": [
+    {
+      "session_id": "a3f9c2d1",
+      "scan_type": "full",
+      "tests_added": 47,
+      "triggered_at": "2026-04-23T10:00:00Z"
+    },
+    {
+      "session_id": "b9e4f100",
+      "scan_type": "incremental",
+      "tests_added": 6,
+      "changed_files": ["src/components/CheckoutForm.tsx"],
+      "triggered_at": "2026-04-23T14:30:00Z"
+    }
+  ],
+  "tests": [
+    {
+      "test_id": "TC-A3F2B1",
+      "name": "User can complete checkout with valid card",
+      "category": "integration",
+      "page_path": "/checkout",
+      "severity": "critical",
+      "added_in_session": "b9e4f100",
+      "is_active": true,
+      "steps": [...],
+      "playwright_code": "..."
+    }
+  ],
+  "new_test_ids": ["TC-A3F2B1", "TC-9B2C4D"]
+}
 ```
 
 ---
 
-*Plan version 1.0 — Production Grade, No Blockers*
+## 10. Folder Structure
+
+```
+testgen-api/
+  ├── main.py
+  ├── .env
+  ├── models/
+  │   └── repo.py
+  ├── db/
+  │   ├── mongo.py
+  │   └── migrations.py
+  ├── services/
+  │   ├── repo_service.py
+  │   ├── ai_service.py
+  │   ├── diff_service.py
+  │   ├── test_store.py
+  │   └── session_service.py
+  ├── routes/
+  │   └── repos.py
+  └── workers/
+      └── scan_worker.py     (Celery task for async scan)
+
+testgen-ui/
+  ├── app/
+  │   ├── page.tsx            (landing / submit form)
+  │   └── repo/
+  │       └── [repo_id]/
+  │           ├── page.tsx    (dashboard)
+  │           └── session/
+  │               └── [session_id]/page.tsx
+  ├── components/
+  │   ├── TestCard.tsx
+  │   ├── TestCategoryTabs.tsx
+  │   ├── NewTestsBanner.tsx
+  │   ├── ScanProgress.tsx
+  │   ├── SessionHistory.tsx
+  │   └── PlaywrightCodeViewer.tsx
+  ├── lib/
+  │   ├── api.ts
+  │   └── store.ts            (Zustand)
+  └── types/
+      └── repo.ts
+```
+
+---
+
+## 11. Edge Cases & Production Guards
+
+| Scenario | Handling |
+|---|---|
+| Same repo submitted twice within 30 seconds | Debounce: return existing session, don't create duplicate |
+| Repo has 1000+ files | Priority queue: routes > components > utils. Hard cap at 200 files. |
+| AI returns malformed JSON | Retry 3x with "please return only valid JSON" correction prompt |
+| AI hallucinated test names identical to existing | `deduplicate_tests()` catches this as final pass |
+| Private repo, no token | Return 422 with clear message: "Provide github_token for private repos" |
+| AI times out (>30s) | Partial save: save whatever tests completed before timeout, mark session as partial |
+| Commit SHA unchanged on re-submit | Short-circuit: return `{tests_added: 0, message: "No changes since last scan"}` |
+| Very large files (>50KB) | Truncate to first 50KB with a note in the prompt: "file truncated" |
+| Test deduplication false positive | Keep similarity threshold at 0.85. Lower = too aggressive. Higher = misses real dupes. |
+
+---
+
+## 12. What "No Blockers" Means Here
+
+Every piece of this plan uses available, stable technology:
+
+- **Claude claude-sonnet-4** via official Anthropic Python SDK — available now
+- **MongoDB Atlas free tier** — no credit card for first 512MB
+- **GitPython** — no GitHub token needed for public repos
+- **FastAPI + motor** — pure async, no thread issues
+- **Next.js 14** — stable, no experimental features needed
+- **All AI prompts return structured JSON** — validated before storage, never crashes on bad output
+
+The only optional dependency is Redis/Celery for the background worker. For an MVP, you can run the scan synchronously with a longer HTTP timeout (120s). Swap to async queue when needed without changing any other code.
+
+---
+
+*Last updated: April 2026*
+*Plan version: 1.0 — Production ready, no known blockers*

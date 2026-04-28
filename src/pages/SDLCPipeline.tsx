@@ -10,9 +10,9 @@ import { StageReport } from "@/components/pipeline/StageReport";
 function PipelineContent() {
   const { activeStage } = usePipelineContext();
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden bg-background">
       <PipelineStageBar />
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 relative">
         {activeStage === 1 && <StageWorkspace />}
         {activeStage === 2 && <StageCodeReview />}
         {activeStage === 3 && <StageDeployment />}
