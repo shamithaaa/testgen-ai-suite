@@ -1294,7 +1294,7 @@ export function TreeFlowView({
 
         {/* Global Test Alignment Bottom Panel */}
         <AnimatePresence>
-          {alignmentPanelOpen && generatingTests && (
+          {alignmentPanelOpen && (generatingTests || hasTests) && (
             <motion.div
               initial={{ y: 200, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -1447,7 +1447,7 @@ export function TreeFlowView({
               </div>
             </motion.div>
           )}
-          {!alignmentPanelOpen && generatingTests && (
+          {!alignmentPanelOpen && (generatingTests || hasTests) && (
             <button
               type="button"
               className="absolute bottom-4 left-4 z-[50] inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/90 px-3 py-2 text-[11px] font-semibold text-foreground shadow-xl backdrop-blur-xl hover:border-primary/40 hover:bg-background"
