@@ -292,6 +292,39 @@ function buildGraphologyGraph(
       graph.setNodeAttribute(node, "x", (x - centerX) * scale);
       graph.setNodeAttribute(node, "y", (y - centerY) * scale);
     });
+
+    // Final normalize by bounds midpoint so visual extents are centered at origin.
+    let finalMinX = Infinity;
+    let finalMaxX = -Infinity;
+    let finalMinY = Infinity;
+    let finalMaxY = -Infinity;
+    graph.forEachNode((node) => {
+      const x = graph.getNodeAttribute(node, "x") as number;
+      const y = graph.getNodeAttribute(node, "y") as number;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      finalMinX = Math.min(finalMinX, x);
+      finalMaxX = Math.max(finalMaxX, x);
+      finalMinY = Math.min(finalMinY, y);
+      finalMaxY = Math.max(finalMaxY, y);
+    });
+
+    if (
+      Number.isFinite(finalMinX) &&
+      Number.isFinite(finalMaxX) &&
+      Number.isFinite(finalMinY) &&
+      Number.isFinite(finalMaxY)
+    ) {
+      const offsetX = (finalMinX + finalMaxX) / 2;
+      const offsetY = (finalMinY + finalMaxY) / 2;
+      if (offsetX !== 0 || offsetY !== 0) {
+        graph.forEachNode((node) => {
+          const x = graph.getNodeAttribute(node, "x") as number;
+          const y = graph.getNodeAttribute(node, "y") as number;
+          graph.setNodeAttribute(node, "x", x - offsetX);
+          graph.setNodeAttribute(node, "y", y - offsetY);
+        });
+      }
+    }
   }
   return graph;
 }
@@ -401,8 +434,11 @@ function GraphInteractionLayer({
   const lastResetRef = useRef(0);
 
   const getCenterCamera = useCallback(() => {
+    // Sigma internally normalizes node coordinates into a [0,1] x [0,1] square.
+    // The visual center of the graph is therefore (0.5, 0.5), and a ratio
+    // around 1.1 leaves a small breathing margin around the cluster.
     if (!graph || graph.order === 0) {
-      return { x: 0, y: 0, ratio: 1.2 };
+      return { x: 0.5, y: 0.5, ratio: 1.1 };
     }
 
     const normalizedSearch = searchText.trim().toLowerCase();
@@ -413,19 +449,12 @@ function GraphInteractionLayer({
       focusNeighborhood.add(activeFocusNode);
     }
 
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    let sumX = 0;
-    let sumY = 0;
-    let count = 0;
-
+    let visibleCount = 0;
+    let totalCount = 0;
     graph.forEachNode((node) => {
+      totalCount += 1;
       const attrs = graph.getNodeAttributes(node) as SigmaNodeAttrs;
-
       if (!activeExtensions.has(attrs.ext)) return;
-
       if (
         insightMode &&
         attrs.inDegree === 0 &&
@@ -436,53 +465,38 @@ function GraphInteractionLayer({
       ) {
         return;
       }
-
       if (normalizedSearch.length > 0) {
         const label = attrs.label?.toLowerCase() ?? "";
         const path = attrs.path?.toLowerCase() ?? "";
         if (!label.includes(normalizedSearch) && !path.includes(normalizedSearch)) return;
       }
-
-      if (isolateFocus && activeFocusNode && focusNeighborhood.size > 0 && !focusNeighborhood.has(node)) {
+      if (
+        isolateFocus &&
+        activeFocusNode &&
+        focusNeighborhood.size > 0 &&
+        !focusNeighborhood.has(node)
+      ) {
         return;
       }
-
-      const x = Number(attrs.x);
-      const y = Number(attrs.y);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y);
-      maxY = Math.max(maxY, y);
-      sumX += x;
-      sumY += y;
-      count += 1;
+      visibleCount += 1;
     });
 
-    if (
-      count === 0 ||
-      !Number.isFinite(minX) ||
-      !Number.isFinite(maxX) ||
-      !Number.isFinite(minY) ||
-      !Number.isFinite(maxY)
-    ) {
-      return { x: 0, y: 0, ratio: 1.2 };
-    }
-
-    const span = Math.max(maxX - minX, maxY - minY) || 1;
-    const ratio = clamp(span / 120, 0.72, 2.8);
-    const centerX = sumX / count;
-    const centerY = sumY / count;
-
-    return { x: centerX, y: centerY, ratio };
+    // Slightly tighter zoom when only a small subset is visible.
+    const visibleRatio = totalCount > 0 ? visibleCount / totalCount : 1;
+    const ratio = clamp(0.85 + visibleRatio * 0.4, 0.85, 1.25);
+    return { x: 0.5, y: 0.5, ratio };
   }, [graph, activeExtensions, insightMode, searchText, isolateFocus, selectedNode, focusPath]);
 
   const centerGraph = useCallback(
     (duration = 0) => {
       const camera = sigma.getCamera();
       if (!camera) return;
-      camera.animate(getCenterCamera(), { duration });
+      const target = getCenterCamera();
+      if (duration <= 0) {
+        camera.setState(target);
+      } else {
+        camera.animate(target, { duration });
+      }
       sigma.refresh();
     },
     [sigma, getCenterCamera],
@@ -518,8 +532,10 @@ function GraphInteractionLayer({
     if (!graph || !sigma) return;
     try {
       loadGraph(graph);
-      const t1 = window.setTimeout(() => centerGraph(0), 80);
-      const t2 = window.setTimeout(() => centerGraph(180), 260);
+      // Keep initial centering deterministic across first mount/remount cycles.
+      centerGraph(0);
+      const t1 = window.setTimeout(() => centerGraph(0), 60);
+      const t2 = window.setTimeout(() => centerGraph(180), 240);
       return () => {
         window.clearTimeout(t1);
         window.clearTimeout(t2);
@@ -554,9 +570,19 @@ function GraphInteractionLayer({
 
     const focus = selectedNode || null;
     if (focus && graph.hasNode(focus)) {
-      const { x, y } = graph.getNodeAttributes(focus) as any;
-      if (typeof x === "number" && typeof y === "number" && isFinite(x) && isFinite(y)) {
-        sigma.getCamera().animate({ x, y, ratio: 0.55 }, { duration: 800 });
+      // Use sigma's display data so we get the post-normalization [0,1] coords.
+      const display = sigma.getNodeDisplayData(focus);
+      if (
+        display &&
+        Number.isFinite(display.x) &&
+        Number.isFinite(display.y)
+      ) {
+        sigma
+          .getCamera()
+          .animate(
+            { x: display.x, y: display.y, ratio: 0.55 },
+            { duration: 800 },
+          );
       }
     }
   }, [sigma, graph, selectedNode, cameraResetCount, getCenterCamera]);
