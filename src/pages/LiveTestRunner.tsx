@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Github,
@@ -130,9 +130,9 @@ function ScreenshotViewer({
   const current = withShots[Math.min(idx, withShots.length - 1)];
 
   return (
-    <div className="mt-3 rounded-lg border border-border/50 bg-black/30 overflow-hidden">
+    <div className="mt-3 rounded-lg border border-border/50 bg-muted/20 overflow-hidden">
       {/* Screenshot */}
-      <div className="relative bg-black">
+      <div className="relative bg-muted/20">
         <img
           src={`data:image/png;base64,${current.screenshot}`}
           alt={current.step_description}
@@ -189,33 +189,53 @@ function LiveTestCard({ result }: { result: LiveTestResult }) {
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-lg border border-border/50 bg-card/50 overflow-hidden"
+      className="floating-card overflow-hidden rounded-2xl"
     >
       {/* Header row */}
       <button
-        className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/20 transition-colors"
+        className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-muted/30"
         onClick={() => setOpen((v) => !v)}
       >
-        {statusIcon}
-        <span className="flex-1 text-sm font-medium truncate">{result.test_name}</span>
-        {result.duration_ms && (
-          <span className="text-[11px] text-muted-foreground mr-2">
-            {(result.duration_ms / 1000).toFixed(1)}s
-          </span>
-        )}
-        <span className="text-xs text-muted-foreground">
-          {result.steps_completed}/{result.total_steps} steps
-        </span>
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-border/50 bg-background/60 shadow-sm">
+          {statusIcon}
+        </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-semibold text-foreground/90">{result.test_name}</span>
+            {result.status === "running" && (
+              <Badge variant="outline" className="h-5 border-primary/30 bg-primary/10 px-1.5 text-[9px] font-bold uppercase tracking-widest text-primary">
+                Live
+              </Badge>
+            )}
+            {result.status === "passed" && (
+              <Badge variant="outline" className="h-5 border-success/30 bg-success/10 px-1.5 text-[9px] font-bold uppercase tracking-widest text-success">
+                Passed
+              </Badge>
+            )}
+            {result.status === "failed" && (
+              <Badge variant="outline" className="h-5 border-destructive/30 bg-destructive/10 px-1.5 text-[9px] font-bold uppercase tracking-widest text-destructive">
+                Failed
+              </Badge>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            {result.duration_ms && <span>{(result.duration_ms / 1000).toFixed(1)}s</span>}
+            <span className="h-1 w-1 rounded-full bg-border" />
+            <span>
+              {result.steps_completed}/{result.total_steps} steps
+            </span>
+          </div>
+        </div>
         {open ? (
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-1" />
+          <ChevronDown className="ml-1 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
         ) : (
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground ml-1" />
+          <ChevronRight className="ml-1 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
         )}
       </button>
 
       {/* Progress bar (while running) */}
       {result.status === "running" && (
-        <Progress value={progress} className="h-0.5 rounded-none" />
+        <Progress value={progress} className="h-1 rounded-none bg-muted/30" />
       )}
 
       {/* Expanded content */}
@@ -227,12 +247,12 @@ function LiveTestCard({ result }: { result: LiveTestResult }) {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="px-3 pb-3 space-y-1.5">
+            <div className="space-y-2 border-t border-border/30 px-4 pb-4 pt-3">
               {/* Error banner */}
               {result.error && (
-                <div className="flex items-start gap-2 rounded bg-red-500/10 border border-red-500/20 p-2">
-                  <AlertTriangle className="h-3.5 w-3.5 text-red-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-red-400">{result.error}</p>
+                <div className="flex items-start gap-2 rounded-2xl border border-destructive/20 bg-destructive/5 p-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+                  <p className="text-xs leading-relaxed text-destructive/90">{result.error}</p>
                 </div>
               )}
 
@@ -241,9 +261,9 @@ function LiveTestCard({ result }: { result: LiveTestResult }) {
                 return (
                   <div
                     key={i}
-                    className={`flex items-start gap-2 text-xs rounded p-1.5 ${sr.status === "fail"
-                        ? "bg-red-500/10 border border-red-500/20"
-                        : "bg-muted/30"
+                    className={`flex items-start gap-2 rounded-2xl border px-3 py-2 text-xs transition-colors ${sr.status === "fail"
+                        ? "border-destructive/20 bg-destructive/5"
+                        : "border-border/50 bg-muted/20"
                       }`}
                   >
                     {sr.status === "pass" ? (
@@ -251,7 +271,7 @@ function LiveTestCard({ result }: { result: LiveTestResult }) {
                     ) : (
                       <XCircle className="h-3 w-3 text-red-400 mt-0.5 flex-shrink-0" />
                     )}
-                    <span className="text-muted-foreground flex-1">{sr.step_description}</span>
+                    <span className="flex-1 text-muted-foreground">{sr.step_description}</span>
                     {sr.screenshot && (
                       <Camera className="h-3 w-3 text-cyan-400 flex-shrink-0" />
                     )}
@@ -276,26 +296,29 @@ function TestCasePreview({ test }: { test: PlaywrightTestCase }) {
   const sev = test.severity || "Medium";
 
   return (
-    <div className="rounded-lg border border-border/50 bg-card/40 overflow-hidden">
+    <div className="floating-card overflow-hidden rounded-2xl">
       <button
-        className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/20 transition-colors"
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/30"
         onClick={() => setOpen((v) => !v)}
       >
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{test.name}</p>
-          <p className="text-[11px] text-muted-foreground truncate">{test.page_name}</p>
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-border/50 bg-background/60 text-primary shadow-sm">
+          <FlaskConical className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="truncate text-sm font-semibold text-foreground/90">{test.name}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{test.page_name}</p>
         </div>
         <Badge
           variant="outline"
-          className={`text-[10px] ${severityClass[sev] ?? ""} flex-shrink-0`}
+          className={`flex-shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${severityClass[sev] ?? ""}`}
         >
           {sev}
         </Badge>
-        <span className="text-[11px] text-muted-foreground ml-1">{test.steps.length} steps</span>
+        <span className="ml-1 text-[11px] text-muted-foreground">{test.steps.length} steps</span>
         {open ? (
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
         ) : (
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
         )}
       </button>
 
@@ -307,17 +330,17 @@ function TestCasePreview({ test }: { test: PlaywrightTestCase }) {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="px-3 pb-3 space-y-1">
-              <p className="text-xs text-muted-foreground mb-2">{test.description}</p>
+            <div className="space-y-2 border-t border-border/30 px-4 pb-4 pt-3">
+              <p className="mb-2 text-xs leading-relaxed text-muted-foreground">{test.description}</p>
               {test.steps.map((step, i) => {
                 const { label, color } = stepActionLabel(step.action);
                 return (
-                  <div key={i} className="flex items-center gap-2 text-xs">
-                    <span className={`w-16 text-right font-mono text-[10px] ${color}`}>
+                  <div key={i} className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-3 py-2 text-xs">
+                    <span className={`w-16 text-right font-mono text-[10px] uppercase tracking-widest ${color}`}>
                       {label}
                     </span>
                     <ArrowRight className="h-3 w-3 text-border flex-shrink-0" />
-                    <span className="text-muted-foreground truncate">{step.description}</span>
+                    <span className="flex-1 truncate text-muted-foreground">{step.description}</span>
                   </div>
                 );
               })}
@@ -401,30 +424,33 @@ function TestCaseEditor({
   const displayTest = editing ? draft : test;
 
   return (
-    <div className="rounded-lg border border-border/50 bg-card/40 overflow-hidden">
+    <div className="floating-card overflow-hidden rounded-2xl">
       <button
-        className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/20 transition-colors"
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/30"
         onClick={() => !editing && setOpen((v) => !v)}
       >
-        <div className="flex-1 min-w-0">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-border/50 bg-background/60 text-primary shadow-sm">
+          <FlaskConical className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-0.5">
           {editing ? (
             <Input
               value={draft.name}
               onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))}
-              className="h-7 text-sm font-medium"
+              className="h-8 rounded-xl border-border/50 bg-background/70 text-sm font-medium"
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <p className="text-sm font-medium truncate">{displayTest.name}</p>
+            <p className="truncate text-sm font-semibold text-foreground/90">{displayTest.name}</p>
           )}
-          <p className="text-[11px] text-muted-foreground truncate mt-0.5">{displayTest.page_name}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{displayTest.page_name}</p>
         </div>
         {editing ? (
           <select
             value={draft.severity}
             onChange={(e) => setDraft((p) => ({ ...p, severity: e.target.value }))}
             onClick={(e) => e.stopPropagation()}
-            className="text-[10px] rounded border border-border/50 bg-background px-1.5 py-0.5 flex-shrink-0"
+            className="flex-shrink-0 rounded-full border border-border/50 bg-background px-2 py-1 text-[10px] uppercase tracking-widest"
           >
             {SEVERITIES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -440,13 +466,13 @@ function TestCaseEditor({
         {!editing && (
           <button
             onClick={startEdit}
-            className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+            className="flex-shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
             title="Edit test case"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
         )}
-        {!editing && (open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />)}
+        {!editing && (open ? <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />)}
       </button>
 
       <AnimatePresence>
@@ -457,17 +483,17 @@ function TestCaseEditor({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="px-3 pb-3 space-y-2">
+            <div className="space-y-3 border-t border-border/30 px-4 pb-4 pt-3">
               {/* Description */}
               {editing ? (
                 <Textarea
                   value={draft.description}
                   onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))}
-                  className="text-xs min-h-[60px]"
+                  className="min-h-[72px] rounded-xl border-border/50 bg-background/70 text-xs"
                   placeholder="Test description..."
                 />
               ) : (
-                <p className="text-xs text-muted-foreground">{displayTest.description}</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">{displayTest.description}</p>
               )}
 
               {/* Steps */}
@@ -475,20 +501,20 @@ function TestCaseEditor({
                 {(editing ? draft.steps : displayTest.steps).map((step, i) => {
                   const { label, color } = stepActionLabel(step.action);
                   return editing ? (
-                    <div key={i} className="rounded bg-muted/20 border border-border/30 p-2 space-y-1.5">
+                    <div key={i} className="space-y-1.5 rounded-2xl border border-border/40 bg-muted/20 p-3">
                       <div className="flex items-center gap-2">
                         <GripVertical className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                        <span className="text-[10px] text-muted-foreground font-mono w-5">{i + 1}.</span>
+                        <span className="w-5 font-mono text-[10px] text-muted-foreground">{i + 1}.</span>
                         <select
                           value={step.action}
                           onChange={(e) => updateStep(i, "action", e.target.value)}
-                          className="text-[10px] rounded border border-border/50 bg-background px-1.5 py-0.5 flex-1"
+                          className="flex-1 rounded-lg border border-border/50 bg-background px-1.5 py-1 text-[10px]"
                         >
                           {STEP_ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
                         </select>
                         <button
                           onClick={() => removeStep(i)}
-                          className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 flex-shrink-0"
+                          className="flex-shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -497,28 +523,28 @@ function TestCaseEditor({
                         value={step.description}
                         onChange={(e) => updateStep(i, "description", e.target.value)}
                         placeholder="Step description"
-                        className="h-6 text-[11px]"
+                        className="h-8 rounded-lg border-border/50 bg-background/70 text-[11px]"
                       />
                       <div className="grid grid-cols-2 gap-1.5">
                         <Input
                           value={step.selector ?? ""}
                           onChange={(e) => updateStep(i, "selector", e.target.value)}
                           placeholder='selector (e.g. button:has-text("OK"))'
-                          className="h-6 text-[10px] font-mono"
+                          className="h-8 rounded-lg border-border/50 bg-background/70 text-[10px] font-mono"
                         />
                         <Input
                           value={step.value ?? ""}
                           onChange={(e) => updateStep(i, "value", e.target.value)}
                           placeholder="value"
-                          className="h-6 text-[10px] font-mono"
+                          className="h-8 rounded-lg border-border/50 bg-background/70 text-[10px] font-mono"
                         />
                       </div>
                     </div>
                   ) : (
-                    <div key={i} className="flex items-center gap-2 text-xs">
-                      <span className={`w-20 text-right font-mono text-[10px] ${color}`}>{label}</span>
+                    <div key={i} className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-3 py-2 text-xs">
+                      <span className={`w-20 text-right font-mono text-[10px] uppercase tracking-widest ${color}`}>{label}</span>
                       <ArrowRight className="h-3 w-3 text-border flex-shrink-0" />
-                      <span className="text-muted-foreground truncate">{step.description}</span>
+                      <span className="truncate text-muted-foreground">{step.description}</span>
                     </div>
                   );
                 })}
@@ -526,7 +552,7 @@ function TestCaseEditor({
                 {editing && (
                   <button
                     onClick={addStep}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded border border-dashed border-border/50 text-[11px] text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border/50 py-2 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
                   >
                     <Plus className="h-3 w-3" /> Add Step
                   </button>
@@ -536,11 +562,11 @@ function TestCaseEditor({
               {/* Edit actions */}
               {editing && (
                 <div className="flex gap-2 pt-1">
-                  <Button size="sm" className="h-7 text-xs" onClick={saveEdit} disabled={saving}>
+                  <Button size="sm" className="h-8 rounded-full text-xs" onClick={saveEdit} disabled={saving}>
                     {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
                     Save
                   </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={cancelEdit} disabled={saving}>
+                  <Button size="sm" variant="outline" className="h-8 rounded-full text-xs" onClick={cancelEdit} disabled={saving}>
                     <X className="h-3 w-3 mr-1" /> Cancel
                   </Button>
                 </div>
@@ -644,8 +670,8 @@ function UploadSpecPanel({
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-5">
-      <Card className="rounded-2xl border-border/50 shadow-sm">
-        <CardHeader className="pb-0">
+      <Card className="floating-card overflow-hidden rounded-[2rem] border-border/40">
+        <CardHeader className="bg-card/60 pb-0">
           <div className="flex items-start gap-3">
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-shrink-0">
               <Upload className="h-5 w-5 text-primary" />
@@ -659,17 +685,17 @@ function UploadSpecPanel({
           </div>
         </CardHeader>
 
-        <CardContent className="p-6 space-y-5">
+        <CardContent className="bg-card/50 p-6 space-y-5">
           {errorMsg && (
-            <div className="flex items-start gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3">
-              <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-red-400">{errorMsg}</p>
+            <div className="flex items-start gap-2 rounded-2xl border border-destructive/20 bg-destructive/5 p-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+              <p className="text-xs text-destructive/90">{errorMsg}</p>
             </div>
           )}
 
           {/* Drop zone */}
           <div
-            className={`relative rounded-xl border-2 border-dashed transition-colors cursor-pointer ${dragOver
+            className={`relative cursor-pointer rounded-3xl border-2 border-dashed transition-colors ${dragOver
                 ? "border-primary bg-primary/5"
                 : selectedFile
                   ? "border-green-500/50 bg-green-500/5"
@@ -687,10 +713,10 @@ function UploadSpecPanel({
               className="sr-only"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
             />
-            <div className="flex flex-col items-center gap-3 py-8 px-4 text-center">
+            <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
               {selectedFile ? (
                 <>
-                  <div className="h-12 w-12 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-green-500/20 bg-green-500/10">
                     <FileCode className="h-6 w-6 text-green-400" />
                   </div>
                   <div>
@@ -700,7 +726,7 @@ function UploadSpecPanel({
                 </>
               ) : (
                 <>
-                  <div className="h-12 w-12 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border/50 bg-muted/50">
                     <Upload className="h-6 w-6 text-muted-foreground" />
                   </div>
                   <div>
@@ -716,7 +742,7 @@ function UploadSpecPanel({
 
           {/* Target URL */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
               <Globe className="h-3.5 w-3.5" /> Target App URL
             </label>
             <Input
@@ -724,12 +750,12 @@ function UploadSpecPanel({
               value={targetUrl}
               onChange={(e) => setTargetUrl(e.target.value)}
               disabled={isParsing}
-              className="h-10"
+              className="h-11 rounded-xl border-border/50 bg-background/70"
             />
             {isLocalhost && targetUrl.trim().length > 10 ? (
-              <div className="flex items-start gap-1.5 rounded bg-yellow-500/10 border border-yellow-500/20 px-2 py-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 flex-shrink-0 mt-0.5" />
-                <p className="text-[11px] text-yellow-300 leading-snug">
+              <div className="flex items-start gap-1.5 rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-3 py-2">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-yellow-400" />
+                <p className="text-[11px] leading-snug text-yellow-300">
                   Playwright runs <strong>inside the backend</strong>. Your app must be accessible from this machine.
                 </p>
               </div>
@@ -738,16 +764,16 @@ function UploadSpecPanel({
             )}
           </div>
 
-          <div className="space-y-2 rounded-lg border border-border/50 bg-card/30 p-3">
-            <p className="text-xs font-medium text-foreground/90">Test Credentials (if login is required)</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="space-y-2 rounded-2xl border border-border/40 bg-card/50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Test Credentials (if login is required)</p>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               <Input
                 type="email"
                 placeholder="qa-user@example.com"
                 value={testEmail}
                 onChange={(e) => setTestEmail(e.target.value)}
                 disabled={isParsing}
-                className="h-10"
+                className="h-11 rounded-xl border-border/50 bg-background/70"
               />
               <div className="relative">
                 <Input
@@ -756,12 +782,12 @@ function UploadSpecPanel({
                   value={testPassword}
                   onChange={(e) => setTestPassword(e.target.value)}
                   disabled={isParsing}
-                  className="h-10 pr-10"
+                  className="h-11 rounded-xl border-border/50 bg-background/70 pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   <Eye className="h-4 w-4" />
@@ -944,20 +970,20 @@ function InputPhase({
           </div>
         </CardHeader>
 
-        <CardContent className="p-8">
+        <CardContent className="bg-card/50 p-8">
           {errorMsg && (
-            <div className="mb-5 flex items-start gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-3">
-              <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-red-400">{errorMsg}</p>
+            <div className="mb-5 flex items-start gap-2 rounded-2xl border border-destructive/20 bg-destructive/5 p-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+              <p className="text-xs text-destructive/90">{errorMsg}</p>
             </div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
             {/* Left: Configuration */}
             <div className="w-full min-w-0 space-y-5 lg:pr-6 lg:border-r border-border/40">
-              <div className="rounded-xl border border-border/50 bg-card/30 p-5 space-y-5">
+              <div className="floating-card rounded-[1.75rem] p-5 space-y-5">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                     <Github className="h-3.5 w-3.5" /> GitHub Repository URL
                   </label>
                   <Input
@@ -965,7 +991,7 @@ function InputPhase({
                     value={githubUrl}
                     onChange={(e) => setGithubUrl(e.target.value)}
                     disabled={isAnalyzing}
-                    className="h-10"
+                    className="h-11 rounded-xl border-border/50 bg-background/70"
                   />
                   <p className="text-[11px] text-muted-foreground">
                     Shallow clone + AI analysis uses this repository.
@@ -973,7 +999,7 @@ function InputPhase({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                     <Globe className="h-3.5 w-3.5" /> Target App URL (running server)
                   </label>
                   <Input
@@ -981,12 +1007,12 @@ function InputPhase({
                     value={targetUrl}
                     onChange={(e) => setTargetUrl(e.target.value)}
                     disabled={isAnalyzing}
-                    className="h-10"
+                    className="h-11 rounded-xl border-border/50 bg-background/70"
                   />
                   {isLocalhost && targetUrl.trim().length > 10 ? (
-                    <div className="flex items-start gap-1.5 mt-1 rounded bg-yellow-500/10 border border-yellow-500/20 px-2 py-1.5">
-                      <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 flex-shrink-0 mt-0.5" />
-                      <p className="text-[11px] text-yellow-300 leading-snug">
+                    <div className="mt-1 flex items-start gap-1.5 rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-3 py-2">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-yellow-400" />
+                      <p className="text-[11px] leading-snug text-yellow-300">
                         Playwright runs <strong>inside the backend</strong>. Your app must be running
                         on this machine at the port above. Vite default is{" "}
                         <code className="font-mono">:5173</code>, not <code className="font-mono">:8083</code>.
@@ -1000,21 +1026,21 @@ function InputPhase({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                     <Layers className="h-3.5 w-3.5" /> Test Case Type
                   </label>
                   <Select value={testCaseType} onValueChange={setTestCaseType} disabled={isAnalyzing}>
-                    <SelectTrigger className="w-full h-10 bg-card/60 border-border/60 hover:border-border focus:ring-primary/20">
+                    <SelectTrigger className="h-11 w-full rounded-xl border-border/60 bg-card/70 hover:border-border focus:ring-primary/20">
                       <SelectValue>
                         {TEST_CASE_TYPES.find((t) => t.value === testCaseType)?.label ?? "Select test type…"}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent className="bg-card border-border/60">
+                    <SelectContent className="rounded-2xl border-border/60 bg-card shadow-2xl backdrop-blur-xl">
                       {TEST_CASE_TYPES.map((type) => (
                         <SelectItem
                           key={type.value}
                           value={type.value}
-                          className="cursor-pointer focus:bg-primary/10 data-[state=checked]:bg-primary/10 py-2.5"
+                          className="cursor-pointer py-2.5 focus:bg-primary/10 data-[state=checked]:bg-primary/10"
                         >
                           <div className="flex flex-col gap-0.5">
                             <span className="font-semibold text-[13px] text-foreground">{type.label}</span>
@@ -1033,9 +1059,9 @@ function InputPhase({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border/50 bg-card/30 p-5 space-y-4">
+              <div className="floating-card rounded-[1.75rem] p-5 space-y-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                     <ListChecks className="h-3.5 w-3.5" /> What to Test
                   </label>
                   <p className="text-[11px] text-muted-foreground">
@@ -1048,7 +1074,7 @@ function InputPhase({
                         type="button"
                         disabled={isAnalyzing}
                         onClick={() => toggleChip(label)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border transition-colors ${selectedChips.has(label)
+                        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${selectedChips.has(label)
                             ? "bg-primary/20 border-primary/50 text-primary"
                             : "bg-muted/40 border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground"
                           }`}
@@ -1061,7 +1087,7 @@ function InputPhase({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">Description</label>
+                  <label className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Description</label>
                   <p className="text-[11px] text-muted-foreground">
                     Provide extra context, edge cases, and expected behaviors.
                   </p>
@@ -1070,17 +1096,17 @@ function InputPhase({
                     value={testPreferences}
                     onChange={(e) => setTestPreferences(e.target.value)}
                     disabled={isAnalyzing}
-                    className="min-h-[110px] text-xs resize-none"
+                    className="min-h-[110px] resize-none rounded-xl border-border/50 bg-background/70 text-xs"
                   />
                 </div>
               </div>
             </div>
 
             {/* Right: Control panel */}
-            <div className="w-full min-w-0 rounded-xl border border-border/50 bg-muted/20 p-5 flex flex-col gap-5 self-start">
-              <div className="rounded-xl border border-border/50 bg-card/40 p-4 space-y-3">
+            <div className="floating-card flex w-full min-w-0 flex-col gap-5 self-start rounded-[1.75rem] p-5">
+              <div className="rounded-[1.5rem] border border-border/40 bg-card/50 p-4 space-y-3">
                 <div className="space-y-1">
-                  <p className="text-xs font-semibold text-muted-foreground">Login Credentials</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Login Credentials</p>
                   <p className="text-[11px] text-muted-foreground">
                     Optional — used for apps that require sign-in.
                   </p>
@@ -1095,7 +1121,7 @@ function InputPhase({
                       value={testEmail}
                       onChange={(e) => setTestEmail(e.target.value)}
                       disabled={isAnalyzing}
-                      className="h-10"
+                      className="h-11 rounded-xl border-border/50 bg-background/70"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1107,11 +1133,11 @@ function InputPhase({
                         value={testPassword}
                         onChange={(e) => setTestPassword(e.target.value)}
                         disabled={isAnalyzing}
-                        className="h-10 pr-10"
+                        className="h-11 rounded-xl border-border/50 bg-background/70 pr-10"
                       />
                       <button
                         type="button"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-[10px]"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground hover:text-foreground"
                         onClick={() => setShowPassword((v) => !v)}
                       >
                         {showPassword ? "hide" : "show"}
@@ -1121,15 +1147,15 @@ function InputPhase({
                 </div>
 
                 {testEmail && (
-                  <p className="text-[11px] text-green-400 flex items-center gap-1">
+                  <p className="flex items-center gap-1 text-[11px] text-green-500">
                     <CheckCircle2 className="h-3 w-3" /> Credentials will be injected into login test steps
                   </p>
                 )}
               </div>
 
-              <div className="rounded-xl border border-border/50 bg-card/40 p-4 space-y-3">
+              <div className="rounded-[1.5rem] border border-border/40 bg-card/50 p-4 space-y-3">
                 <div className="space-y-1">
-                  <p className="text-xs font-semibold text-muted-foreground">Testing Scope</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Testing Scope</p>
                   <p className="text-[11px] text-muted-foreground">
                     Choose whether to test the entire app or target a commit.
                   </p>
@@ -1145,9 +1171,9 @@ function InputPhase({
                         setTestingScope(scope);
                         setSelectedCommit(null);
                       }}
-                      className={`flex items-start gap-3 px-3 py-3 rounded-lg border text-left transition-colors ${testingScope === scope
-                          ? "bg-primary/15 border-primary/50"
-                          : "bg-muted/30 border-border/40 hover:border-primary/30"
+                        className={`flex items-start gap-3 rounded-2xl border px-3 py-3 text-left transition-colors ${testingScope === scope
+                          ? "border-primary/40 bg-primary/10"
+                          : "border-border/40 bg-muted/20 hover:border-primary/30 hover:bg-primary/5"
                         }`}
                     >
                       <div className={`h-8 w-8 rounded-lg flex items-center justify-center border flex-shrink-0 ${testingScope === scope
@@ -1264,10 +1290,10 @@ function InputPhase({
                 )}
               </div>
 
-              <div className="rounded-xl border border-border/50 bg-card/40 p-4 space-y-2">
+              <div className="rounded-[1.5rem] border border-border/40 bg-card/50 p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground">Number of Tests</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Number of Tests</p>
                     <p className="text-[11px] text-muted-foreground">How many test cases to generate (1–10)</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1275,14 +1301,14 @@ function InputPhase({
                       type="button"
                       disabled={isAnalyzing || numTests <= 1}
                       onClick={() => setNumTests((v) => Math.max(1, v - 1))}
-                      className="h-7 w-7 rounded border border-border/60 bg-muted/40 text-sm font-bold text-foreground hover:bg-muted disabled:opacity-40 flex items-center justify-center"
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-muted/40 text-sm font-bold text-foreground hover:bg-muted disabled:opacity-40"
                     >−</button>
                     <span className="w-6 text-center text-sm font-semibold tabular-nums">{numTests}</span>
                     <button
                       type="button"
                       disabled={isAnalyzing || numTests >= 10}
                       onClick={() => setNumTests((v) => Math.min(10, v + 1))}
-                      className="h-7 w-7 rounded border border-border/60 bg-muted/40 text-sm font-bold text-foreground hover:bg-muted disabled:opacity-40 flex items-center justify-center"
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-muted/40 text-sm font-bold text-foreground hover:bg-muted disabled:opacity-40"
                     >+</button>
                   </div>
                 </div>
@@ -1417,14 +1443,14 @@ function AnalyzingPhase({
 
       {/* Live log terminal */}
       {logs.length > 0 && (
-        <div className="rounded-lg border border-border/50 bg-black/50 overflow-hidden">
-          <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/40 bg-black/40">
+        <div className="rounded-lg border border-border/50 bg-muted/20 overflow-hidden">
+          <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/40 bg-muted/30">
             <div className="h-2.5 w-2.5 rounded-full bg-red-500/70" />
             <div className="h-2.5 w-2.5 rounded-full bg-yellow-500/70" />
             <div className="h-2.5 w-2.5 rounded-full bg-green-500/70" />
-            <span className="text-[10px] text-white ml-2 font-mono">analysis log</span>
+            <span className="text-[10px] text-foreground/70 ml-2 font-mono">analysis log</span>
           </div>
-          <div className="p-3 space-y-0.5 max-h-52 overflow-y-auto font-mono text-white">
+          <div className="p-3 space-y-0.5 max-h-52 overflow-y-auto font-mono text-foreground/80">
             {logs.map((line, i) => (
               <p
                 key={i}
@@ -1509,15 +1535,15 @@ function ReadyPhase({
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       {/* Premium Header Strip */}
-      <div className="flex items-center justify-between bg-card/40 border border-border/40 p-6 rounded-[2.5rem] backdrop-blur-md shadow-xl">
-        <div className="flex items-center gap-6">
+      <div className="flex items-center justify-between bg-card/60 border border-border/50 px-5 py-4 rounded-2xl backdrop-blur-md shadow-sm">
+        <div className="flex items-center gap-5">
           <div className="flex items-center gap-4">
-             <div className="p-3 rounded-2xl bg-orange-500/10 border border-orange-500/20 shadow-inner">
-               <Sparkles className="h-6 w-6 text-orange-400" />
+             <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 shadow-inner">
+               <Sparkles className="h-6 w-6 text-primary" />
              </div>
              <div>
-               <p className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground/60 mb-0.5">Intelligence Status</p>
-               <h4 className="text-lg font-black uppercase tracking-tight">Active Growth Stream</h4>
+               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 mb-0.5">Intelligence Status</p>
+               <h4 className="text-base font-black uppercase tracking-tight">Active Growth Stream</h4>
              </div>
           </div>
           <div className="h-10 w-px bg-border/20" />
@@ -1533,7 +1559,7 @@ function ReadyPhase({
               <div className="h-10 w-px bg-border/20" />
               <div className="flex items-center gap-4">
                 <div className="flex flex-col">
-                  <Label htmlFor="baseline-toggle-ltr" className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 mb-1.5 cursor-pointer">
+                  <Label htmlFor="baseline-toggle-ltr" className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/60 mb-1.5 cursor-pointer">
                     Integrate Baseline
                   </Label>
                   <div className="flex items-center gap-3">
@@ -1551,10 +1577,10 @@ function ReadyPhase({
         </div>
 
         <div className="flex items-center gap-4">
-          <Button variant="outline" className="h-12 px-6 rounded-2xl border-border/40 hover:bg-muted/20 font-black uppercase tracking-widest text-[10px]" onClick={onReset} disabled={isExecuting}>
+          <Button variant="outline" className="h-10 px-5 rounded-2xl border-border/40 hover:bg-muted/20 font-black uppercase tracking-[0.18em] text-[10px]" onClick={onReset} disabled={isExecuting}>
             New Session
           </Button>
-          <Button className="h-12 px-10 rounded-2xl shadow-xl shadow-orange-500/20 bg-orange-500 hover:bg-orange-600 text-white font-black uppercase tracking-widest text-[10px]" onClick={() => onExecute(mappedTests as any)} disabled={isExecuting || (isSpecUpload && !specTargetUrl?.trim().startsWith("http"))}>
+          <Button className="h-10 px-8 rounded-2xl shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase tracking-[0.18em] text-[10px]" onClick={() => onExecute(mappedTests as any)} disabled={isExecuting || (isSpecUpload && !specTargetUrl?.trim().startsWith("http"))}>
             {isExecuting ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <Play className="h-4 w-4 mr-3 fill-current" />}
             Trigger Growth
           </Button>
@@ -1562,7 +1588,7 @@ function ReadyPhase({
       </div>
 
       {analysis.summary && (
-        <div className="rounded-3xl border border-border/30 bg-muted/5 p-6 backdrop-blur-sm">
+        <div className="rounded-2xl border border-border/30 bg-muted/5 p-6 backdrop-blur-sm">
            <div className="flex items-start gap-4">
               <div className="p-2 rounded-xl bg-primary/10 mt-1">
                  <Info className="h-4 w-4 text-primary" />
@@ -1639,20 +1665,39 @@ function ExecutionPhase({
   const successRatePercent = total > 0 ? Math.round((passed / total) * 100) : 0;
 
   const runningTest = results.find((r) => r.status === "running");
-  const latestFrame = runningTest?.step_results.slice().reverse().find((s) => s.screenshot)?.screenshot ?? null;
+  const freshestFrame =
+    runningTest?.step_results.slice().reverse().find((s) => s.screenshot)?.screenshot ??
+    results
+      .slice()
+      .reverse()
+      .flatMap((r) => r.step_results.slice().reverse())
+      .find((s) => s.screenshot)?.screenshot ??
+    null;
+  const [displayFrame, setDisplayFrame] = useState<string | null>(freshestFrame);
+
+  useEffect(() => {
+    if (freshestFrame) {
+      setDisplayFrame((prev) => (prev === freshestFrame ? prev : freshestFrame));
+    } else if (status !== "running") {
+      setDisplayFrame(null);
+    }
+  }, [freshestFrame, status]);
+
+  const frameLabel = runningTest ? `Active Trace: ${runningTest.test_name}` : "Live browser feed";
+  const awaitingNextFrame = status === "running" && !freshestFrame && !!displayFrame;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
       {/* Simulation Monitor */}
-      <div className="rounded-[3rem] border border-border/50 bg-black overflow-hidden shadow-[0_30px_90px_rgba(0,0,0,0.5)]">
-        <div className="flex items-center gap-3 px-6 py-4 bg-zinc-900 border-b border-border/30">
+      <div className="rounded-2xl border border-border/50 bg-card/60 overflow-hidden shadow-sm">
+        <div className="flex items-center gap-3 px-6 py-4 bg-card/50 border-b border-border/30">
           <div className="flex gap-2">
             <div className="h-3 w-3 rounded-full bg-red-500/70 shadow-[0_0_10px_rgba(239,68,68,0.4)]" />
             <div className="h-3 w-3 rounded-full bg-yellow-500/70 shadow-[0_0_10px_rgba(234,179,8,0.4)]" />
             <div className="h-3 w-3 rounded-full bg-green-500/70 shadow-[0_0_10px_rgba(34,197,94,0.4)]" />
           </div>
-          <div className="flex-1 mx-4 bg-zinc-800/50 rounded-xl px-4 py-1.5 text-[11px] text-muted-foreground font-mono truncate border border-zinc-700/50">
-            {runningTest ? `Active Trace: ${runningTest.test_name}` : "Playwright Execution Bridge"}
+          <div className="flex-1 mx-4 bg-muted/20 rounded-xl px-4 py-1.5 text-[11px] text-muted-foreground font-mono truncate border border-border/40">
+            {frameLabel}
           </div>
           {status === "running" && (
             <div className="flex items-center gap-2.5 text-[10px] text-yellow-400 font-black bg-yellow-400/10 px-3 py-1 rounded-full border border-yellow-400/20 tracking-widest uppercase">
@@ -1661,16 +1706,16 @@ function ExecutionPhase({
             </div>
           )}
         </div>
-        <div className="relative aspect-video bg-zinc-950 flex items-center justify-center min-h-[400px]">
+        <div className="relative aspect-video bg-muted/30 flex items-center justify-center min-h-[400px]">
           <AnimatePresence mode="wait">
-            {latestFrame ? (
+            {displayFrame ? (
               <motion.img
-                key={latestFrame.slice(-20)}
+                key={displayFrame.slice(-20)}
                 initial={{ opacity: 0, scale: 1.05 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
-                src={`data:image/png;base64,${latestFrame}`}
+                src={`data:image/png;base64,${displayFrame}`}
                 alt="Live browser feed"
                 className="w-full h-full object-contain"
               />
@@ -1683,11 +1728,17 @@ function ExecutionPhase({
               </div>
             )}
           </AnimatePresence>
+          {awaitingNextFrame && (
+            <div className="absolute bottom-4 right-4 flex items-center gap-2 rounded-full border border-border/50 bg-background/85 px-3 py-1.5 text-[10px] font-medium text-muted-foreground shadow-sm backdrop-blur">
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              Updating live step...
+            </div>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-         <div className="lg:col-span-2 rounded-[2.5rem] border border-border/40 bg-card/60 backdrop-blur-md p-8 shadow-2xl relative overflow-hidden">
+         <div className="lg:col-span-2 rounded-2xl border border-border/40 bg-card/60 backdrop-blur-md p-5 shadow-sm relative overflow-hidden">
             <div className="flex items-center justify-between mb-8 relative">
               <div className="flex items-center gap-4">
                 <div className={cn(
@@ -1701,8 +1752,8 @@ function ExecutionPhase({
                   )}
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground/60 mb-0.5">Execution Metrics</p>
-                  <p className="text-lg font-black uppercase tracking-tight">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 mb-0.5">Execution Metrics</p>
+                  <p className="text-base font-black uppercase tracking-tight">
                     {status === "running" ? `Processing Unit ${completedCount + 1} of ${total}` : "Validation Protocols Concluded"}
                   </p>
                 </div>
@@ -1711,14 +1762,14 @@ function ExecutionPhase({
                 <div className="flex items-center gap-3">
                   <Button 
                     variant="outline" 
-                    className="h-12 px-6 rounded-2xl border-border/40 bg-background/50 hover:bg-background font-black uppercase tracking-widest text-[10px] shadow-sm transform hover:scale-105 transition-all"
+                    className="h-10 px-5 rounded-2xl border-border/40 bg-background/50 hover:bg-background font-black uppercase tracking-[0.18em] text-[10px] shadow-sm transform hover:scale-105 transition-all"
                     onClick={() => downloadLiveTestReport(runStatus!, analysis)}
                   >
                     <Download className="h-4 w-4 mr-2.5 text-primary" /> Analysis Pack
                   </Button>
                   <Button 
                     variant="ghost" 
-                    className="h-12 w-12 rounded-2xl border border-border/20 hover:bg-muted/40 transition-all p-0"
+                    className="h-10 w-10 rounded-2xl border border-border/20 hover:bg-muted/40 transition-all p-0"
                     onClick={onReset}
                   >
                     <RotateCcw className="h-4 w-4 text-muted-foreground" />
@@ -1732,7 +1783,7 @@ function ExecutionPhase({
                 <span>Coverage Depth</span>
                 <span className="text-primary font-bold">{progressPercent}%</span>
               </div>
-              <Progress value={progressPercent} className="h-3 rounded-full bg-muted/30 shadow-inner" />
+              <Progress value={progressPercent} className="h-2.5 rounded-full bg-muted/30 shadow-inner" />
             </div>
 
             <div className="grid grid-cols-3 gap-4">
@@ -1741,30 +1792,30 @@ function ExecutionPhase({
                 { label: "Friction", value: failed, icon: AlertTriangle, color: "text-red-400", bg: "bg-red-400/5" },
                 { label: "Resolved", value: completedCount, icon: Play, color: "text-primary", bg: "bg-primary/5" },
               ].map((stat) => (
-                <div key={stat.label} className={cn("p-5 rounded-3xl border border-border/20 backdrop-blur-sm transition-all hover:border-border/40", stat.bg)}>
+                <div key={stat.label} className={cn("p-4 rounded-2xl border border-border/20 backdrop-blur-sm transition-all hover:border-border/40", stat.bg)}>
                   <div className="flex items-center justify-between mb-2">
                     <stat.icon className={cn("h-4 w-4", stat.color)} />
                     <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">{stat.label}</span>
                   </div>
-                  <p className="text-3xl font-black tabular-nums tracking-tighter">{stat.value}</p>
+                  <p className="text-2xl font-black tabular-nums tracking-tighter">{stat.value}</p>
                 </div>
               ))}
             </div>
          </div>
 
-         <div className="rounded-[2.5rem] border border-border/40 bg-gradient-to-br from-orange-500/10 to-orange-500/5 p-8 flex flex-col justify-center items-center text-center backdrop-blur-md shadow-2xl relative overflow-hidden group">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(249,115,22,0.15),transparent)] opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
+         <div className="rounded-2xl border border-border/40 bg-gradient-to-br from-primary/10 to-primary/5 px-5 py-6 flex flex-col justify-center items-center text-center backdrop-blur-md shadow-sm relative overflow-hidden group">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(52,211,153,0.15),transparent)] opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
             <div className="relative space-y-4">
-              <div className="p-5 rounded-full bg-background/50 border border-orange-500/20 shadow-2xl inline-block mb-2 transform group-hover:scale-110 transition-transform duration-700">
-                <Sparkles className="h-10 w-10 text-orange-500 animate-pulse" />
+              <div className="p-4 rounded-full bg-background/50 border border-primary/20 shadow-sm inline-block mb-2 transform group-hover:scale-110 transition-transform duration-700">
+                <Sparkles className="h-10 w-10 text-primary animate-pulse" />
               </div>
-              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-orange-500/70">{total} Active Units</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-primary/70">{total} Active Units</p>
               <div className="space-y-1">
-                <p className="text-6xl font-black tabular-nums tracking-tighter text-orange-500">
+                <p className="text-4xl font-black tabular-nums tracking-tighter text-primary">
                   {status === "running" ? Math.round(progressPercent) : successRatePercent}
-                  <span className="text-2xl ml-1 text-orange-500/60">%</span>
+                  <span className="text-2xl ml-1 text-primary/60">%</span>
                 </p>
-                <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest">
+                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
                   {status === "running" ? "Stream Progress" : "Accuracy Rating"}
                 </p>
               </div>
@@ -1775,7 +1826,7 @@ function ExecutionPhase({
       <div className="space-y-6">
         <div className="flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
-             <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+             <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
              <h2 className="text-[12px] font-black text-muted-foreground uppercase tracking-[0.25em]">Observation Log</h2>
           </div>
           <div className="flex items-center gap-8">
@@ -1810,9 +1861,9 @@ function RunDetailSheet({ run, open, onClose }: { run: RunSummaryItem | null; op
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
+      <SheetContent side="right" className="flex w-full flex-col border-l border-border/50 bg-background/95 p-0 backdrop-blur-xl sm:max-w-2xl">
         {/* Header */}
-        <SheetHeader className="px-6 py-5 border-b border-border/50 bg-card/50">
+        <SheetHeader className="border-b border-border/40 bg-card/60 px-6 py-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className={`h-3 w-3 rounded-full flex-shrink-0 ${run.status === "completed" ? "bg-green-400" :
@@ -1850,7 +1901,7 @@ function RunDetailSheet({ run, open, onClose }: { run: RunSummaryItem | null; op
                 { label: "Failed", value: run.failed, color: "text-red-400" },
                 { label: "Rate", value: `${rate}%`, color: rate >= 80 ? "text-green-400" : rate >= 50 ? "text-yellow-400" : "text-red-400" },
               ].map(({ label, value, color }) => (
-                <div key={label} className="rounded-xl border border-border/50 bg-card/60 p-3 text-center">
+                <div key={label} className="rounded-2xl border border-border/40 bg-card/60 p-3 text-center shadow-sm">
                   <p className={`text-2xl font-bold ${color}`}>{value}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
                 </div>
@@ -1901,7 +1952,7 @@ function RunDetailSheet({ run, open, onClose }: { run: RunSummaryItem | null; op
                   {run.results.map((r, i) => (
                     <div
                       key={i}
-                      className={`rounded-lg border p-3 flex items-center gap-3 ${r.status === "passed"
+                      className={`flex items-center gap-3 rounded-2xl border p-3 ${r.status === "passed"
                           ? "border-green-500/25 bg-green-500/5"
                           : r.status === "failed"
                             ? "border-red-500/25 bg-red-500/5"
@@ -1915,7 +1966,7 @@ function RunDetailSheet({ run, open, onClose }: { run: RunSummaryItem | null; op
                       ) : (
                         <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       )}
-                      <span className="flex-1 text-sm font-medium">{r.test_name}</span>
+                      <span className="flex-1 text-sm font-medium text-foreground/90">{r.test_name}</span>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {r.duration_ms && (
                           <Badge variant="outline" className="text-[10px] font-mono h-5 px-1.5">
@@ -1935,7 +1986,7 @@ function RunDetailSheet({ run, open, onClose }: { run: RunSummaryItem | null; op
                   ))}
                 </div>
               ) : (
-                <div className="rounded-lg border border-border/40 bg-card/30 p-6 text-center text-muted-foreground text-sm">
+                <div className="rounded-2xl border border-border/40 bg-card/30 p-6 text-center text-sm text-muted-foreground">
                   No detailed results available for this run.
                 </div>
               )}
@@ -1961,7 +2012,7 @@ function RunHistoryPanel() {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-xl mx-auto mt-6 space-y-3"
+      className="mx-auto mt-6 max-w-2xl space-y-3"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -1971,11 +2022,11 @@ function RunHistoryPanel() {
         <Badge variant="outline" className="text-[10px]">{runs.length} runs</Badge>
       </div>
 
-      <div className="rounded-xl border border-border/50 bg-card/30 divide-y divide-border/30 overflow-hidden">
+      <div className="floating-card overflow-hidden rounded-2xl divide-y divide-border/30">
         {runs.slice(0, 10).map((run) => {
           const rate = run.total > 0 ? Math.round((run.passed / run.total) * 100) : 0;
           return (
-            <div key={run.run_id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors">
+            <div key={run.run_id} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30">
               {/* Status dot */}
               <span className={`h-2 w-2 rounded-full flex-shrink-0 ${run.status === "completed" ? "bg-green-400" :
                   run.status === "failed" ? "bg-red-400" :
@@ -2139,7 +2190,7 @@ export default function LiveTestRunner({
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-500/10 blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      <div className="relative z-10 p-6 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
+      <div className="relative z-10 mx-auto max-w-7xl space-y-8 p-6 animate-in fade-in duration-700 lg:px-8">
 
 
         <div className="relative">
