@@ -12,6 +12,7 @@ import "@react-sigma/core/lib/style.css";
 import { Search, X, Maximize2, Minimize2, Loader2, AlertCircle, FileCode } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { GraphEdge, GraphNode } from "@/lib/api";
+import { useTheme } from "@/hooks/use-theme";
 
 interface GephiSigmaGraphProps {
   nodes: GraphNode[];
@@ -32,6 +33,7 @@ type SigmaNodeAttrs = {
   degree: number;
   inDegree: number;
   outDegree: number;
+  importance?: number;
   isChanged: boolean;
 };
 
@@ -97,6 +99,16 @@ function colorForModule(path: string): string {
     hash = moduleName.charCodeAt(i) + ((hash << 5) - hash);
   }
   return PALETTE[Math.abs(hash) % PALETTE.length];
+}
+
+function colorForImportance(importance: number, maxImportance: number): string {
+  // High-importance nodes (major files) get accent colors
+  // Low-importance get muted/secondary colors
+  const ratio = Math.min(importance / Math.max(maxImportance, 1), 1);
+  if (ratio > 0.7) return "#ef4444"; // Red - critical hub
+  if (ratio > 0.5) return "#f97316"; // Orange - major node
+  if (ratio > 0.3) return "#eab308"; // Amber - important
+  return "#94a3b8"; // Slate - leaf nodes
 }
 
 // ── Graph Logic ──────────────────────────────────────────────────────────────
@@ -170,13 +182,23 @@ function buildGraphologyGraph(
     }
   });
 
+  // Calculate max importance for normalization
+  let maxImportance = 0;
+  const importances: Map<string, number> = new Map();
+  
+  for (const node of nodes) {
+    const indeg = inDegree.get(node.path) ?? 0;
+    const outdeg = outDegree.get(node.path) ?? 0;
+    const importance = (indeg * 2.8) + (outdeg * 1.5);
+    importances.set(node.path, importance);
+    maxImportance = Math.max(maxImportance, importance);
+  }
+
   for (const node of nodes) {
     const indeg = inDegree.get(node.path) ?? 0;
     const outdeg = outDegree.get(node.path) ?? 0;
     const degree = indeg + outdeg;
-
-    // Phase 1: Multi-factor Importance Score
-    const importance = (indeg * 2.8) + (outdeg * 1.5); // Boost weights
+    const importance = importances.get(node.path) ?? 0;
     const size = 7 + Math.sqrt(importance) * 5;
 
     const pos = deterministicPosition(node.path);
@@ -192,7 +214,7 @@ function buildGraphologyGraph(
       size: Math.min(50, Math.max(7, size)),
       x: pos.x,
       y: pos.y,
-      color: (changedPaths.has(node.path) || node.is_changed) ? "#f97316" : colorForModule(node.path),
+      color: (changedPaths.has(node.path) || node.is_changed) ? "#f97316" : colorForImportance(importance, maxImportance),
       isChanged: (changedPaths.has(node.path) || node.is_changed),
     } as SigmaNodeAttrs);
   }
@@ -578,10 +600,15 @@ function GraphInteractionLayer({
   useEffect(() => {
     const normalizedSearch = searchText.trim().toLowerCase();
     const activeFocusNode = hoveredNodeInternal || selectedNode || focusPath || null;
+    const hasActiveFocusNode = Boolean(activeFocusNode && graph.hasNode(activeFocusNode));
     const isHovering = Boolean(hoveredNodeInternal);
-    const connected = activeFocusNode && graph.hasNode(activeFocusNode)
+    const connected = hasActiveFocusNode
       ? getNeighborhood(activeFocusNode)
       : new Set<string>();
+    const dimNodeColor = "#f1f5f9";
+    const softEdgeColor = "#cbd5e1";
+    const outboundEdgeColor = "#f97316";
+    const inboundEdgeColor = "#0ea5e9";
 
     sigma.setSetting("nodeReducer", (node, data) => {
       try {
@@ -601,28 +628,30 @@ function GraphInteractionLayer({
           (attrs.path && attrs.path.toLowerCase().includes(normalizedSearch));
 
         if (!matchesSearch && normalizedSearch.length > 0) {
-          return { ...data, color: "#f1f5f9", label: "", zIndex: 0 };
+          return { ...data, color: dimNodeColor, label: "", zIndex: 0 };
         }
 
         // Phase 2: Focus Mode (Persistent on Click or Hover or Selected UI File)
         const isCurrentFocus = node === activeFocusNode;
         const isCurrentlyEdited = node === focusPath; // UI explicitly is editing this
+        const isSelected = node === selectedNode; // Clicked node should always stay visible
 
         // Dim nodes that are not in the neighborhood of the active focus
-        if (activeFocusNode && !connected.has(node) && (isHovering || isolateFocus)) {
+        // BUT: if it's the selected/clicked node, keep it visible
+        if (hasActiveFocusNode && !connected.has(node) && !isSelected && (isHovering || isolateFocus)) {
           return { ...data, hidden: true };
         }
 
         const result: any = {
           ...data,
-          color: isCurrentlyEdited ? "#0ea5e9" : attrs.color,
+          color: isCurrentlyEdited ? "#0ea5e9" : (isSelected ? "#06b6d4" : attrs.color),
           label: attrs.label,
           zIndex: isCurrentFocus ? 100 : (connected.has(node) ? 10 : 1),
           // Keep labels focused to reduce clutter in dense graphs
-          forceLabel: isCurrentFocus || isCurrentlyEdited,
+          forceLabel: isCurrentFocus || isCurrentlyEdited || isSelected,
         };
 
-        if (isCurrentFocus && typeof data.size === "number") {
+        if ((isCurrentFocus || isSelected) && typeof data.size === "number") {
           result.size = data.size + 12;
         }
 
@@ -657,11 +686,11 @@ function GraphInteractionLayer({
            }
         }
 
-        if (activeFocusNode) {
+        if (hasActiveFocusNode) {
           const isConnected = source === activeFocusNode || target === activeFocusNode;
           
           if (!isConnected) {
-            return (isHovering || isolateFocus) ? { ...data, hidden: true } : { ...data, color: "#cbd5e1", size: 1, zIndex: 1 };
+            return (isHovering || isolateFocus) ? { ...data, hidden: true } : { ...data, color: softEdgeColor, size: 1, zIndex: 1 };
           }
           
           // Differentiate dependency directions
@@ -670,13 +699,13 @@ function GraphInteractionLayer({
           const isOutbound = source === activeFocusNode;
           return { 
             ...data, 
-            color: isOutbound ? "#f97316" : "#0ea5e9", 
+            color: isOutbound ? outboundEdgeColor : inboundEdgeColor,
             size: isOutbound ? 3 : 2, 
             zIndex: 10 
           };
         }
 
-        return { ...data, color: "#cbd5e1", size: 1 };
+        return { ...data, color: softEdgeColor, size: 1 };
       } catch (e) {
         return data;
       }
@@ -697,6 +726,7 @@ export function GephiSigmaGraph({
   changedPaths = new Set<string>(),
   className,
 }: GephiSigmaGraphProps) {
+  const { theme } = useTheme();
   const [isInitializing, setIsInitializing] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
@@ -723,6 +753,25 @@ export function GephiSigmaGraph({
     }
   }, [nodes, edges, changedPaths]);
 
+  const majorNodes = useMemo(() => {
+    const ranked: Array<{ path: string; label: string; importance: number }> = [];
+    graph.forEachNode((node) => {
+      const attrs = graph.getNodeAttributes(node) as SigmaNodeAttrs;
+      ranked.push({
+        path: attrs.path,
+        label: attrs.label,
+        importance: Number(attrs.importance ?? 0),
+      });
+    });
+    ranked.sort((a, b) => b.importance - a.importance);
+    return ranked.slice(0, 5);
+  }, [graph]);
+
+  const canIsolateFocus = useMemo(() => {
+    const activeFocus = selectedNode || focusPath || null;
+    return Boolean(activeFocus && graph.hasNode(activeFocus));
+  }, [selectedNode, focusPath, graph]);
+
   const handleToggleExpanded = () => {
     setIsExpanded((prev) => !prev);
     setSelectedNode(null);
@@ -730,7 +779,7 @@ export function GephiSigmaGraph({
   };
 
   const rootClassName = cn(
-    "h-full min-h-[500px] flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200/60 shadow-sm transition-all duration-300",
+    "h-full min-h-[500px] flex flex-col bg-white dark:bg-slate-950 rounded-2xl overflow-hidden border border-slate-200/60 dark:border-slate-700 shadow-sm transition-all duration-300",
     isExpanded && "fixed inset-0 z-[80] rounded-none border-0 shadow-2xl",
     className,
   );
@@ -738,7 +787,7 @@ export function GephiSigmaGraph({
   return (
     <div className={rootClassName}>
       {/* Translucent Light Header */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-200/40 bg-white/80 backdrop-blur-xl flex items-center gap-8 flex-wrap z-20">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-200/40 dark:border-slate-700 bg-white/80 dark:bg-slate-950/90 backdrop-blur-xl flex items-center gap-8 flex-wrap z-20">
         <div className="relative min-w-[320px] flex-1 max-w-[600px]">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
@@ -770,14 +819,28 @@ export function GephiSigmaGraph({
           </button>
 
           <button
-            onClick={() => setIsolateFocus(!isolateFocus)}
+            onClick={() => {
+              if (isolateFocus) {
+                setIsolateFocus(false);
+                return;
+              }
+              if (canIsolateFocus) setIsolateFocus(true);
+            }}
             className={cn(
               "h-10 px-4 rounded-xl text-[11px] font-black border transition-all duration-300 uppercase tracking-widest flex items-center gap-2",
               isolateFocus
                 ? "border-sky-400/40 bg-sky-400/10 text-sky-600 shadow-sm"
-                : "border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50",
+                : canIsolateFocus
+                  ? "border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                  : "border-slate-200 text-slate-300 opacity-60 cursor-not-allowed",
             )}
-            title={isolateFocus ? "Isolating neighbors of the focused file" : "Showing all connections"}
+            title={
+              isolateFocus
+                ? "Isolating neighbors of the focused file"
+                : canIsolateFocus
+                  ? "Show only direct neighborhood of selected/focused file"
+                  : "Select a node first, then isolate"
+            }
           >
             <div className={cn("w-2 h-2 rounded-full", isolateFocus ? "bg-sky-500 animate-pulse" : "bg-slate-300")} />
             {isolateFocus ? "Isolated" : "Show All"}
@@ -806,6 +869,21 @@ export function GephiSigmaGraph({
         </div>
 
         <div className="ml-auto flex items-center gap-6">
+          {majorNodes.length > 0 && (
+            <div className="hidden 2xl:flex items-center gap-2 max-w-[520px]">
+              <span className="text-[9px] font-black tracking-widest uppercase text-slate-500 dark:text-slate-400">Major Nodes</span>
+              {majorNodes.slice(0, 3).map((node) => (
+                <button
+                  key={node.path}
+                  onClick={() => setSelectedNode(node.path)}
+                  className="px-2 py-1 rounded-lg border border-primary/20 bg-primary/10 text-[10px] font-semibold text-primary truncate max-w-[150px]"
+                  title={`${node.path} (score ${node.importance.toFixed(1)})`}
+                >
+                  {node.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="hidden xl:flex flex-col items-end opacity-40">
             <span className="text-[11px] font-black text-slate-800 uppercase tracking-widest leading-none">{nodes.length} COMPONENTS</span>
             <span className="text-[10px] text-slate-500 font-mono tracking-tighter uppercase">{edges.length} LINKS</span>
@@ -848,7 +926,7 @@ export function GephiSigmaGraph({
             zIndex: true,
             labelFont: "Inter, system-ui, sans-serif",
             labelSize: 12,
-            labelColor: { color: "#475569" },
+            labelColor: { color: theme === "dark" ? "#cbd5e1" : "#475569" },
             labelWeight: "700",
           }}
         >
