@@ -6,11 +6,19 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+coverage/
+playwright-report/
+test-results/
 
 node_modules
 dist
 dist-ssr
+.vite/
+*.tsbuildinfo
 *.local
+.vercel/
+.claude/
+.playwright-mcp/
 
 # Editor directories and files
 .vscode/*
@@ -36,3 +44,7 @@ ENV/
 env/
 *.pyc
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
