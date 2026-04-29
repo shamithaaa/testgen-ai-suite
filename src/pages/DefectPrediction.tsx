@@ -40,10 +40,10 @@ function CustomTreemapContent({ x, y, width, height, name, risk_score }: any) {
   );
 }
 
-const DEFAULT_REPO = "balaji-joulestowatts/simple-tasks";
+const DEFAULT_REPO_URL = "https://github.com/balaji-joulestowatts/simple-tasks";
 
 function RepoInput({ onSearch }: { onSearch: (owner: string, repo: string) => void }) {
-  const [input, setInput] = useState(DEFAULT_REPO);
+  const [input, setInput] = useState(DEFAULT_REPO_URL);
   const handle = () => {
     const parts = input.trim().replace("https://github.com/", "").split("/");
     if (parts.length >= 2) onSearch(parts[0], parts[1]);
@@ -58,7 +58,7 @@ function RepoInput({ onSearch }: { onSearch: (owner: string, repo: string) => vo
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="owner/repo"
+          placeholder={DEFAULT_REPO_URL}
           className="flex-1 bg-muted/30 border-border/50"
           onKeyDown={(e) => e.key === "Enter" && handle()}
         />

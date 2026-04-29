@@ -36,7 +36,7 @@ function ConnectForm({
   initialBranch?: string;
   onConnected?: (args: { githubUrl: string; branch: string; pat?: string }) => void;
 } = {}) {
-  const [repoUrl, setRepoUrl] = useState(initialRepoUrl ?? "");
+  const [repoUrl, setRepoUrl] = useState(initialRepoUrl ?? "https://github.com/balaji-joulestowatts/simple-tasks");
   const [branch, setBranch] = useState(initialBranch ?? "main");
   const [pat, setPat] = useState("");
   const [showPat, setShowPat] = useState(false);
@@ -80,7 +80,7 @@ function ConnectForm({
             <Input
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
-              placeholder="owner/repo  or  https://github.com/owner/repo"
+              placeholder="https://github.com/balaji-joulestowatts/simple-tasks"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleConnect();
               }}

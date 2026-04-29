@@ -60,7 +60,7 @@ function isActionableFinding(finding: any): boolean {
 }
 
 function RepoInput({ onSearch }: { onSearch: (owner: string, repo: string) => void }) {
-  const [input, setInput] = useState("balaji-joulestowatts/simple-tasks");
+  const [input, setInput] = useState("https://github.com/balaji-joulestowatts/simple-tasks");
 
   const handleSearch = () => {
     const parts = input.trim().replace("https://github.com/", "").split("/");
@@ -79,7 +79,7 @@ function RepoInput({ onSearch }: { onSearch: (owner: string, repo: string) => vo
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="owner/repo  or  https://github.com/owner/repo"
+          placeholder="https://github.com/balaji-joulestowatts/simple-tasks"
           className="flex-1 bg-muted/30 border-border/50"
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
         />

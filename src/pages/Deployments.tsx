@@ -329,7 +329,7 @@ export default function Deployments() {
                   setRepoUrl(e.target.value);
                   setRepoValidated(false);
                 }}
-                placeholder="https://github.com/owner/repo"
+                placeholder="https://github.com/balaji-joulestowatts/simple-tasks"
                 className="mt-1"
               />
               <div className="mt-2 flex gap-2">

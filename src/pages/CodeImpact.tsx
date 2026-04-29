@@ -478,7 +478,7 @@ export default function CodeImpact() {
 
   const connectWorkspace = useConnectWorkspace();
 
-  const [repoUrl, setRepoUrl] = useState("");
+  const [repoUrl, setRepoUrl] = useState("https://github.com/balaji-joulestowatts/simple-tasks");
   const [branch, setBranch] = useState("main");
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
 
@@ -577,7 +577,7 @@ export default function CodeImpact() {
 
             <div className="space-y-3">
               <Input
-                placeholder="https://github.com/owner/repo"
+                placeholder="https://github.com/balaji-joulestowatts/simple-tasks"
                 value={repoUrl}
                 onChange={(e) => setRepoUrl(e.target.value)}
               />

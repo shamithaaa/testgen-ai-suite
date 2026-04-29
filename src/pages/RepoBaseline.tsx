@@ -497,7 +497,7 @@ function ScanProgressView({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function RepoBaseline() {
-  const [githubUrl, setGithubUrl] = useState("");
+  const [githubUrl, setGithubUrl] = useState("https://github.com/balaji-joulestowatts/simple-tasks");
   const [githubToken, setGithubToken] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -892,7 +892,7 @@ export default function RepoBaseline() {
             </label>
             <Input
               id="baseline-github-url"
-              placeholder="https://github.com/owner/repo"
+              placeholder="https://github.com/balaji-joulestowatts/simple-tasks"
               value={githubUrl}
               onChange={(e) => setGithubUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleScan()}

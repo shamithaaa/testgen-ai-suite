@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Github,
@@ -424,33 +424,30 @@ function TestCaseEditor({
   const displayTest = editing ? draft : test;
 
   return (
-    <div className="floating-card overflow-hidden rounded-2xl">
+    <div className="rounded-lg border border-border/50 bg-card/40 overflow-hidden">
       <button
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/30"
+        className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/20 transition-colors"
         onClick={() => !editing && setOpen((v) => !v)}
       >
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-border/50 bg-background/60 text-primary shadow-sm">
-          <FlaskConical className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="flex-1 min-w-0">
           {editing ? (
             <Input
               value={draft.name}
               onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))}
-              className="h-8 rounded-xl border-border/50 bg-background/70 text-sm font-medium"
+              className="h-7 text-sm font-medium"
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <p className="truncate text-sm font-semibold text-foreground/90">{displayTest.name}</p>
+            <p className="text-sm font-medium truncate">{displayTest.name}</p>
           )}
-          <p className="truncate text-[11px] text-muted-foreground">{displayTest.page_name}</p>
+          <p className="text-[11px] text-muted-foreground truncate mt-0.5">{displayTest.page_name}</p>
         </div>
         {editing ? (
           <select
             value={draft.severity}
             onChange={(e) => setDraft((p) => ({ ...p, severity: e.target.value }))}
             onClick={(e) => e.stopPropagation()}
-            className="flex-shrink-0 rounded-full border border-border/50 bg-background px-2 py-1 text-[10px] uppercase tracking-widest"
+            className="text-[10px] rounded border border-border/50 bg-background px-1.5 py-0.5 flex-shrink-0"
           >
             {SEVERITIES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -466,13 +463,13 @@ function TestCaseEditor({
         {!editing && (
           <button
             onClick={startEdit}
-            className="flex-shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+            className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
             title="Edit test case"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
         )}
-        {!editing && (open ? <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />)}
+        {!editing && (open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />)}
       </button>
 
       <AnimatePresence>
@@ -483,17 +480,17 @@ function TestCaseEditor({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="space-y-3 border-t border-border/30 px-4 pb-4 pt-3">
+            <div className="px-3 pb-3 space-y-2">
               {/* Description */}
               {editing ? (
                 <Textarea
                   value={draft.description}
                   onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))}
-                  className="min-h-[72px] rounded-xl border-border/50 bg-background/70 text-xs"
+                  className="text-xs min-h-[60px]"
                   placeholder="Test description..."
                 />
               ) : (
-                <p className="text-xs leading-relaxed text-muted-foreground">{displayTest.description}</p>
+                <p className="text-xs text-muted-foreground">{displayTest.description}</p>
               )}
 
               {/* Steps */}
@@ -501,20 +498,20 @@ function TestCaseEditor({
                 {(editing ? draft.steps : displayTest.steps).map((step, i) => {
                   const { label, color } = stepActionLabel(step.action);
                   return editing ? (
-                    <div key={i} className="space-y-1.5 rounded-2xl border border-border/40 bg-muted/20 p-3">
+                    <div key={i} className="rounded bg-muted/20 border border-border/30 p-2 space-y-1.5">
                       <div className="flex items-center gap-2">
                         <GripVertical className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                        <span className="w-5 font-mono text-[10px] text-muted-foreground">{i + 1}.</span>
+                        <span className="text-[10px] text-muted-foreground font-mono w-5">{i + 1}.</span>
                         <select
                           value={step.action}
                           onChange={(e) => updateStep(i, "action", e.target.value)}
-                          className="flex-1 rounded-lg border border-border/50 bg-background px-1.5 py-1 text-[10px]"
+                          className="text-[10px] rounded border border-border/50 bg-background px-1.5 py-0.5 flex-1"
                         >
                           {STEP_ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
                         </select>
                         <button
                           onClick={() => removeStep(i)}
-                          className="flex-shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
+                          className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 flex-shrink-0"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -523,28 +520,28 @@ function TestCaseEditor({
                         value={step.description}
                         onChange={(e) => updateStep(i, "description", e.target.value)}
                         placeholder="Step description"
-                        className="h-8 rounded-lg border-border/50 bg-background/70 text-[11px]"
+                        className="h-6 text-[11px]"
                       />
                       <div className="grid grid-cols-2 gap-1.5">
                         <Input
                           value={step.selector ?? ""}
                           onChange={(e) => updateStep(i, "selector", e.target.value)}
                           placeholder='selector (e.g. button:has-text("OK"))'
-                          className="h-8 rounded-lg border-border/50 bg-background/70 text-[10px] font-mono"
+                          className="h-6 text-[10px] font-mono"
                         />
                         <Input
                           value={step.value ?? ""}
                           onChange={(e) => updateStep(i, "value", e.target.value)}
                           placeholder="value"
-                          className="h-8 rounded-lg border-border/50 bg-background/70 text-[10px] font-mono"
+                          className="h-6 text-[10px] font-mono"
                         />
                       </div>
                     </div>
                   ) : (
-                    <div key={i} className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-3 py-2 text-xs">
-                      <span className={`w-20 text-right font-mono text-[10px] uppercase tracking-widest ${color}`}>{label}</span>
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className={`w-20 text-right font-mono text-[10px] ${color}`}>{label}</span>
                       <ArrowRight className="h-3 w-3 text-border flex-shrink-0" />
-                      <span className="truncate text-muted-foreground">{step.description}</span>
+                      <span className="text-muted-foreground truncate">{step.description}</span>
                     </div>
                   );
                 })}
@@ -552,7 +549,7 @@ function TestCaseEditor({
                 {editing && (
                   <button
                     onClick={addStep}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border/50 py-2 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded border border-dashed border-border/50 text-[11px] text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
                   >
                     <Plus className="h-3 w-3" /> Add Step
                   </button>
@@ -562,11 +559,11 @@ function TestCaseEditor({
               {/* Edit actions */}
               {editing && (
                 <div className="flex gap-2 pt-1">
-                  <Button size="sm" className="h-8 rounded-full text-xs" onClick={saveEdit} disabled={saving}>
+                  <Button size="sm" className="h-7 text-xs" onClick={saveEdit} disabled={saving}>
                     {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
                     Save
                   </Button>
-                  <Button size="sm" variant="outline" className="h-8 rounded-full text-xs" onClick={cancelEdit} disabled={saving}>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={cancelEdit} disabled={saving}>
                     <X className="h-3 w-3 mr-1" /> Cancel
                   </Button>
                 </div>
@@ -987,7 +984,7 @@ function InputPhase({
                     <Github className="h-3.5 w-3.5" /> GitHub Repository URL
                   </label>
                   <Input
-                    placeholder="https://github.com/owner/repo"
+                    placeholder="https://github.com/balaji-joulestowatts/simple-tasks"
                     value={githubUrl}
                     onChange={(e) => setGithubUrl(e.target.value)}
                     disabled={isAnalyzing}
@@ -1665,26 +1662,7 @@ function ExecutionPhase({
   const successRatePercent = total > 0 ? Math.round((passed / total) * 100) : 0;
 
   const runningTest = results.find((r) => r.status === "running");
-  const freshestFrame =
-    runningTest?.step_results.slice().reverse().find((s) => s.screenshot)?.screenshot ??
-    results
-      .slice()
-      .reverse()
-      .flatMap((r) => r.step_results.slice().reverse())
-      .find((s) => s.screenshot)?.screenshot ??
-    null;
-  const [displayFrame, setDisplayFrame] = useState<string | null>(freshestFrame);
-
-  useEffect(() => {
-    if (freshestFrame) {
-      setDisplayFrame((prev) => (prev === freshestFrame ? prev : freshestFrame));
-    } else if (status !== "running") {
-      setDisplayFrame(null);
-    }
-  }, [freshestFrame, status]);
-
-  const frameLabel = runningTest ? `Active Trace: ${runningTest.test_name}` : "Live browser feed";
-  const awaitingNextFrame = status === "running" && !freshestFrame && !!displayFrame;
+  const latestFrame = runningTest?.step_results.slice().reverse().find((s) => s.screenshot)?.screenshot ?? null;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
@@ -1697,7 +1675,7 @@ function ExecutionPhase({
             <div className="h-3 w-3 rounded-full bg-green-500/70 shadow-[0_0_10px_rgba(34,197,94,0.4)]" />
           </div>
           <div className="flex-1 mx-4 bg-muted/20 rounded-xl px-4 py-1.5 text-[11px] text-muted-foreground font-mono truncate border border-border/40">
-            {frameLabel}
+            {runningTest ? `Active Trace: ${runningTest.test_name}` : "Playwright Execution Bridge"}
           </div>
           {status === "running" && (
             <div className="flex items-center gap-2.5 text-[10px] text-yellow-400 font-black bg-yellow-400/10 px-3 py-1 rounded-full border border-yellow-400/20 tracking-widest uppercase">
@@ -1708,14 +1686,14 @@ function ExecutionPhase({
         </div>
         <div className="relative aspect-video bg-muted/30 flex items-center justify-center min-h-[400px]">
           <AnimatePresence mode="wait">
-            {displayFrame ? (
+            {latestFrame ? (
               <motion.img
-                key={displayFrame.slice(-20)}
+                key={latestFrame.slice(-20)}
                 initial={{ opacity: 0, scale: 1.05 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
-                src={`data:image/png;base64,${displayFrame}`}
+                src={`data:image/png;base64,${latestFrame}`}
                 alt="Live browser feed"
                 className="w-full h-full object-contain"
               />
@@ -1728,12 +1706,6 @@ function ExecutionPhase({
               </div>
             )}
           </AnimatePresence>
-          {awaitingNextFrame && (
-            <div className="absolute bottom-4 right-4 flex items-center gap-2 rounded-full border border-border/50 bg-background/85 px-3 py-1.5 text-[10px] font-medium text-muted-foreground shadow-sm backdrop-blur">
-              <Loader2 className="h-3 w-3 animate-spin text-primary" />
-              Updating live step...
-            </div>
-          )}
         </div>
       </div>
 
