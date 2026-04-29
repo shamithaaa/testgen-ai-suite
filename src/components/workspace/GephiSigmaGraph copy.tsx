@@ -467,32 +467,6 @@ function GraphInteractionLayer({
     [sigma, getCenterCamera],
   );
 
-  const getNeighborhood = useCallback(
-    (node: string) => {
-      const neighborhood = new Set<string>([node]);
-
-      try {
-        const outNeighbors = (graph as any).outNeighbors?.(node) as string[] | undefined;
-        const inNeighbors = (graph as any).inNeighbors?.(node) as string[] | undefined;
-
-        if (Array.isArray(outNeighbors)) {
-          outNeighbors.forEach((neighbor) => neighborhood.add(neighbor));
-        } else {
-          graph.neighbors(node).forEach((neighbor) => neighborhood.add(neighbor as string));
-        }
-
-        if (Array.isArray(inNeighbors)) {
-          inNeighbors.forEach((neighbor) => neighborhood.add(neighbor));
-        }
-      } catch {
-        graph.neighbors(node).forEach((neighbor) => neighborhood.add(neighbor as string));
-      }
-
-      return neighborhood;
-    },
-    [graph],
-  );
-
   useEffect(() => {
     if (!graph || !sigma) return;
     try {
@@ -577,11 +551,14 @@ function GraphInteractionLayer({
 
   useEffect(() => {
     const normalizedSearch = searchText.trim().toLowerCase();
+    
     const activeFocusNode = hoveredNodeInternal || selectedNode || focusPath || null;
-    const isHovering = Boolean(hoveredNodeInternal);
-    const connected = activeFocusNode && graph.hasNode(activeFocusNode)
-      ? getNeighborhood(activeFocusNode)
-      : new Set<string>();
+    let connected = new Set<string>();
+    
+    if (activeFocusNode && graph.hasNode(activeFocusNode)) {
+      connected = new Set(graph.neighbors(activeFocusNode) as string[]);
+      connected.add(activeFocusNode);
+    }
 
     sigma.setSetting("nodeReducer", (node, data) => {
       try {
@@ -609,8 +586,8 @@ function GraphInteractionLayer({
         const isCurrentlyEdited = node === focusPath; // UI explicitly is editing this
 
         // Dim nodes that are not in the neighborhood of the active focus
-        if (activeFocusNode && !connected.has(node) && (isHovering || isolateFocus)) {
-          return { ...data, hidden: true };
+        if (isolateFocus && activeFocusNode && !connected.has(node)) {
+          return { ...data, color: "#f8fafc", label: "", zIndex: 0 };
         }
 
         const result: any = {
@@ -661,7 +638,7 @@ function GraphInteractionLayer({
           const isConnected = source === activeFocusNode || target === activeFocusNode;
           
           if (!isConnected) {
-            return (isHovering || isolateFocus) ? { ...data, hidden: true } : { ...data, color: "#cbd5e1", size: 1, zIndex: 1 };
+            return isolateFocus ? { ...data, hidden: true } : { ...data, color: "#cbd5e1", size: 1, zIndex: 1 };
           }
           
           // Differentiate dependency directions
@@ -683,7 +660,7 @@ function GraphInteractionLayer({
     });
 
     sigma.refresh();
-  }, [sigma, graph, hoveredNodeInternal, activeExtensions, selectedNode, focusPath, searchText, insightMode, isolateFocus, getNeighborhood]);
+  }, [sigma, graph, hoveredNodeInternal, activeExtensions, selectedNode, focusPath, searchText, insightMode, isolateFocus]);
 
   return null;
 }

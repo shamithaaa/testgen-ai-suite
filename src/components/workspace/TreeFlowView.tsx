@@ -22,6 +22,8 @@ import {
   Flame,
   ChevronRight,
   ChevronDown,
+  Maximize2,
+  Minimize2,
   Sparkles,
   Loader2,
   Code2,
@@ -961,6 +963,8 @@ export function TreeFlowView({
   const [generatingFile, setGeneratingFile] = useState<string | null>(null);
   const [flowViewMode, setFlowViewMode] = useState<"chain" | "neighborhood" | "gephi">("gephi");
   const [dialogPhase, setDialogPhase] = useState<"closed" | "analyzing" | "review">("closed");
+  const [alignmentPanelOpen, setAlignmentPanelOpen] = useState(true);
+  const [alignmentPanelExpanded, setAlignmentPanelExpanded] = useState(false);
   const [perFileAnalysis, setPerFileAnalysis] = useState<
     Array<FileChainAnalysis & { requestedCount: number; isLeaf: boolean; isRoot: boolean }>
   >([]);
@@ -1022,6 +1026,12 @@ export function TreeFlowView({
   useEffect(() => {
     setFileTests(null);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (fileTests && fileTests.length > 0) {
+      setAlignmentPanelOpen(true);
+    }
+  }, [fileTests]);
 
   const handleGenerateTests = useCallback(async (countMap: Map<string, number>) => {
     if (!workspace || chain.length === 0) return;
@@ -1185,7 +1195,7 @@ export function TreeFlowView({
               >
                 Gephi
               </button>
-              <button
+              {/* <button
                 type="button"
                 className={cn(
                   "h-5 px-2 rounded text-[10px] border transition-colors",
@@ -1210,7 +1220,7 @@ export function TreeFlowView({
                 title="Show strict root-to-leaf chain only"
               >
                 Chain
-              </button>
+              </button> */}
             </div>
             {chain.length > 0 && (
               <span className="text-[10px] text-muted-foreground/50 bg-muted/40 px-1.5 py-0.5 rounded flex-shrink-0">
@@ -1284,14 +1294,19 @@ export function TreeFlowView({
 
         {/* Global Test Alignment Bottom Panel */}
         <AnimatePresence>
-          {(fileTests || baselineTests.length > 0) && (
+          {alignmentPanelOpen && generatingTests && (
             <motion.div
               initial={{ y: 200, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 200, opacity: 0 }}
               className="absolute bottom-4 left-4 right-4 z-[50]"
             >
-              <div className="bg-background/80 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl overflow-hidden max-h-[400px] flex flex-col border-primary/20">
+              <div
+                className={cn(
+                  "bg-background/80 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl overflow-hidden flex flex-col border-primary/20 transition-all duration-300",
+                  alignmentPanelExpanded ? "max-h-[calc(100vh-7rem)]" : "max-h-[400px]",
+                )}
+              >
                 <div className="flex items-center justify-between px-4 py-2 bg-primary/5 border-b border-border/20">
                   <div className="flex items-center gap-2">
                     {generatingTests && (
@@ -1317,9 +1332,22 @@ export function TreeFlowView({
                     )}
                     <button 
                       className="p-1 hover:bg-muted rounded-full transition-colors"
-                      onClick={() => setFileTests(null)}
+                      onClick={() => {
+                        setAlignmentPanelOpen(false);
+                      }}
                     >
                       <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                    <button
+                      className="p-1 hover:bg-muted rounded-full transition-colors"
+                      onClick={() => setAlignmentPanelExpanded((v) => !v)}
+                      title={alignmentPanelExpanded ? "Collapse panel" : "Expand panel"}
+                    >
+                      {alignmentPanelExpanded ? (
+                        <Minimize2 className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Maximize2 className="h-4 w-4 text-muted-foreground" />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1379,7 +1407,6 @@ export function TreeFlowView({
                                 </div>
                               ))}
                             </div>
-
                             <Button 
                               className="w-full h-11 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 rounded-xl"
                               onClick={async () => {
@@ -1390,6 +1417,7 @@ export function TreeFlowView({
                                     test_id: t.id,
                                     name: t.name,
                                     description: t.description,
+                                    category: "ui_component",
                                     page_path: t.page_name || "/",
                                     severity: t.severity,
                                     steps: t.steps.map(s => ({
@@ -1418,6 +1446,19 @@ export function TreeFlowView({
                 </div>
               </div>
             </motion.div>
+          )}
+          {!alignmentPanelOpen && generatingTests && (
+            <button
+              type="button"
+              className="absolute bottom-4 left-4 z-[50] inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/90 px-3 py-2 text-[11px] font-semibold text-foreground shadow-xl backdrop-blur-xl hover:border-primary/40 hover:bg-background"
+              onClick={() => setAlignmentPanelOpen(true)}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              Test Intelligence Alignment
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary">
+                {fileTests?.reduce((s, g) => s + g.tests.length, 0) || baselineTests.length} ready
+              </span>
+            </button>
           )}
         </AnimatePresence>
       </div>

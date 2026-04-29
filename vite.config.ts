@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    allowedHosts: ["pressure-enjoying-wet-rogers.trycloudflare.com"],
+    allowedHosts: ["blowing-domain-boss-hose.trycloudflare.com"],
     watch: {
       usePolling: true,
       interval: 300,

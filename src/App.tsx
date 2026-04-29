@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Requirements from "./pages/Requirements";
@@ -34,6 +34,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/v1" element={<Navigate to="/" replace />} />
+        <Route path="/v1/*" element={<Navigate to="/" replace />} />
         <Route element={<DashboardLayout />}> {/* App shell with sidebar/header */}
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/requirements" element={<Requirements />} />

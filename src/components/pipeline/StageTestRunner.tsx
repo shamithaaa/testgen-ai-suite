@@ -601,6 +601,7 @@ export function StageTestRunner() {
                          test_id: t.id,
                          name: t.name,
                          description: t.description,
+                         category: "ui_component",
                          page_path: t.page_name || "/",
                          severity: t.severity,
                          steps: t.steps.map(s => ({

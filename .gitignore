@@ -23,20 +23,16 @@ dist-ssr
 *.sln
 *.sw?
 
-# # Python
-# __pycache__/
-# *.py[cod]
-# *.pyd
-# .pytest_cache/
-# .mypy_cache/
-# .ruff_cache/
-# .venv/
-# venv/
-# ENV/
-# env/
-# *.pyc
-# .env
-
-
-
-backend/
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+ENV/
+env/
+*.pyc
+.env
