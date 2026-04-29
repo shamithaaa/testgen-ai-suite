@@ -37,20 +37,20 @@ type SigmaNodeAttrs = {
   isChanged: boolean;
 };
 
-// ── Design Tokens ────────────────────────────────────────────────────────────
+// ── Design Tokens (Light canvas, modern node palette) ───────────────────────
 
-const PALETTE = [
-  "#2dd4bf", // teal-400
-  "#fb923c", // orange-400
-  "#38bdf8", // sky-400
-  "#a78bfa", // violet-400
-  "#4ade80", // green-400
-  "#f472b6", // pink-400
-  "#fbbf24", // amber-400
-  "#818cf8", // indigo-400
-  "#f87171", // red-400
-  "#94a3b8", // slate-400
-];
+const PRIMARY = "#14B8A6";
+const SECONDARY = "#67E8F9";
+const TERTIARY = "#C084FC";
+const HIGHLIGHT = "#0EA5E9";
+const HIGHLIGHT_ALT = "#A855F7";
+const EDGE_SOFT = "rgba(15,23,42,0.22)";
+const EDGE_SOFT_SUBTLE = "rgba(15,23,42,0.18)";
+const EDGE_FOCUS_OUT = "rgba(14,165,233,0.9)";
+const EDGE_FOCUS_IN = "rgba(168,85,247,0.88)";
+const NODE_DIM = "rgba(148,163,184,0.28)";
+
+const PALETTE = [PRIMARY, SECONDARY, TERTIARY];
 
 function extFromPath(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase();
@@ -102,13 +102,10 @@ function colorForModule(path: string): string {
 }
 
 function colorForImportance(importance: number, maxImportance: number): string {
-  // High-importance nodes (major files) get accent colors
-  // Low-importance get muted/secondary colors
   const ratio = Math.min(importance / Math.max(maxImportance, 1), 1);
-  if (ratio > 0.7) return "#ef4444"; // Red - critical hub
-  if (ratio > 0.5) return "#f97316"; // Orange - major node
-  if (ratio > 0.3) return "#eab308"; // Amber - important
-  return "#94a3b8"; // Slate - leaf nodes
+  if (ratio > 0.72) return PRIMARY;
+  if (ratio > 0.42) return TERTIARY;
+  return SECONDARY;
 }
 
 // ── Graph Logic ──────────────────────────────────────────────────────────────
@@ -214,7 +211,7 @@ function buildGraphologyGraph(
       size: Math.min(50, Math.max(7, size)),
       x: pos.x,
       y: pos.y,
-      color: (changedPaths.has(node.path) || node.is_changed) ? "#f97316" : colorForImportance(importance, maxImportance),
+      color: (changedPaths.has(node.path) || node.is_changed) ? HIGHLIGHT : colorForImportance(importance, maxImportance),
       isChanged: (changedPaths.has(node.path) || node.is_changed),
     } as SigmaNodeAttrs);
   }
@@ -223,9 +220,9 @@ function buildGraphologyGraph(
     const edgeKey = `${e.source}->${e.target}`;
     if (!graph.hasEdge(edgeKey)) {
       graph.addDirectedEdgeWithKey(edgeKey, e.source, e.target, {
-        weight: 1.5,
-        size: 2,
-        color: "#94a3b8", // Slate-400 for better visibility
+        weight: 1.8,
+        size: 2.2,
+        color: EDGE_SOFT_SUBTLE,
       });
     }
   }
@@ -354,12 +351,12 @@ function GraphTooltip({ node, graph }: { node: string | null; graph: Graph }) {
           </div>
           <div className="flex flex-col items-center bg-slate-100/50 rounded-lg p-1.5">
             <span className="text-[7px] text-slate-500 font-bold uppercase tracking-widest">OutBound</span>
-            <span className="text-[10px] font-black text-orange-600">{attrs.outDegree}</span>
+            <span className="text-[10px] font-black text-violet-600">{attrs.outDegree}</span>
           </div>
         </div>
 
         {attrs.isChanged && (
-          <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg py-1 px-2 text-[8px] font-black text-orange-600 uppercase tracking-widest text-center">
+          <div className="bg-sky-500/10 border border-sky-500/20 rounded-lg py-1 px-2 text-[8px] font-black text-sky-600 uppercase tracking-widest text-center">
             Modified File
           </div>
         )}
@@ -382,6 +379,7 @@ function GraphInteractionLayer({
   insightMode,
   isolateFocus,
   isExpanded,
+  theme,
 }: {
   graph: Graph;
   focusPath?: string;
@@ -394,6 +392,7 @@ function GraphInteractionLayer({
   insightMode: boolean;
   isolateFocus: boolean;
   isExpanded: boolean;
+  theme: string;
 }) {
   const sigma = useSigma();
   const loadGraph = useLoadGraph();
@@ -605,10 +604,11 @@ function GraphInteractionLayer({
     const connected = hasActiveFocusNode
       ? getNeighborhood(activeFocusNode)
       : new Set<string>();
-    const dimNodeColor = "#f1f5f9";
-    const softEdgeColor = "#cbd5e1";
-    const outboundEdgeColor = "#f97316";
-    const inboundEdgeColor = "#0ea5e9";
+    const isDarkTheme = theme === "dark";
+    const dimNodeColor = isDarkTheme ? "rgba(148,163,184,0.22)" : NODE_DIM;
+    const softEdgeColor = isDarkTheme ? "rgba(148,163,184,0.34)" : EDGE_SOFT;
+    const outboundEdgeColor = EDGE_FOCUS_OUT;
+    const inboundEdgeColor = EDGE_FOCUS_IN;
 
     sigma.setSetting("nodeReducer", (node, data) => {
       try {
@@ -642,9 +642,10 @@ function GraphInteractionLayer({
           return { ...data, hidden: true };
         }
 
+        const isNeighbor = hasActiveFocusNode && connected.has(node) && !isCurrentFocus;
         const result: any = {
           ...data,
-          color: isCurrentlyEdited ? "#0ea5e9" : (isSelected ? "#06b6d4" : attrs.color),
+          color: isCurrentlyEdited ? HIGHLIGHT_ALT : (isSelected ? HIGHLIGHT : attrs.color),
           label: attrs.label,
           zIndex: isCurrentFocus ? 100 : (connected.has(node) ? 10 : 1),
           // Keep labels focused to reduce clutter in dense graphs
@@ -653,6 +654,11 @@ function GraphInteractionLayer({
 
         if ((isCurrentFocus || isSelected) && typeof data.size === "number") {
           result.size = data.size + 12;
+          result.zIndex = 140;
+        }
+        if (isNeighbor && typeof data.size === "number") {
+          result.size = data.size + 4;
+          result.color = SECONDARY;
         }
 
         return result;
@@ -690,7 +696,9 @@ function GraphInteractionLayer({
           const isConnected = source === activeFocusNode || target === activeFocusNode;
           
           if (!isConnected) {
-            return (isHovering || isolateFocus) ? { ...data, hidden: true } : { ...data, color: softEdgeColor, size: 1, zIndex: 1 };
+            return (isHovering || isolateFocus)
+              ? { ...data, hidden: true }
+              : { ...data, color: softEdgeColor, size: isDarkTheme ? 1.45 : 1.75, zIndex: 1 };
           }
           
           // Differentiate dependency directions
@@ -700,19 +708,19 @@ function GraphInteractionLayer({
           return { 
             ...data, 
             color: isOutbound ? outboundEdgeColor : inboundEdgeColor,
-            size: isOutbound ? 3 : 2, 
+            size: isOutbound ? 3.4 : 2.6, 
             zIndex: 10 
           };
         }
 
-        return { ...data, color: softEdgeColor, size: 1 };
+        return { ...data, color: softEdgeColor, size: isDarkTheme ? 1.5 : 1.9 };
       } catch (e) {
         return data;
       }
     });
 
     sigma.refresh();
-  }, [sigma, graph, hoveredNodeInternal, activeExtensions, selectedNode, focusPath, searchText, insightMode, isolateFocus, getNeighborhood]);
+  }, [sigma, graph, hoveredNodeInternal, activeExtensions, selectedNode, focusPath, searchText, insightMode, isolateFocus, getNeighborhood, theme]);
 
   return null;
 }
@@ -779,7 +787,10 @@ export function GephiSigmaGraph({
   };
 
   const rootClassName = cn(
-    "h-full min-h-[500px] flex flex-col bg-white dark:bg-slate-950 rounded-2xl overflow-hidden border border-slate-200/60 dark:border-slate-700 shadow-sm transition-all duration-300",
+    "h-full min-h-[500px] flex flex-col rounded-2xl overflow-hidden border shadow-[0_8px_40px_rgba(14,165,233,0.08)] transition-all duration-300",
+    theme === "dark"
+      ? "bg-slate-950 border-slate-800/80"
+      : "bg-white border-cyan-100/80",
     isExpanded && "fixed inset-0 z-[80] rounded-none border-0 shadow-2xl",
     className,
   );
@@ -787,17 +798,24 @@ export function GephiSigmaGraph({
   return (
     <div className={rootClassName}>
       {/* Translucent Light Header */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-200/40 dark:border-slate-700 bg-white/80 dark:bg-slate-950/90 backdrop-blur-xl flex items-center gap-8 flex-wrap z-20">
+      <div
+        className={cn(
+          "flex-shrink-0 px-6 py-4 border-b backdrop-blur-xl flex items-center gap-8 flex-wrap z-20",
+          theme === "dark"
+            ? "border-slate-800 bg-slate-950/88"
+            : "border-slate-200/40 bg-white/85",
+        )}
+      >
         <div className="relative min-w-[320px] flex-1 max-w-[600px]">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Explore dependency universe..."
-            className="w-full h-11 rounded-2xl border border-slate-200/60 bg-slate-50/50 pl-12 pr-12 text-[13px] text-slate-700 outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono tracking-tight placeholder:text-slate-400"
+            className="w-full h-11 rounded-2xl border border-slate-200/60 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/65 pl-12 pr-12 text-[13px] text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono tracking-tight placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
           {search && (
-            <button onClick={() => setSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">
+            <button onClick={() => setSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-500 hover:text-slate-500 dark:hover:text-slate-300 transition-colors">
               <X className="h-4 w-4" />
             </button>
           )}
@@ -809,16 +827,16 @@ export function GephiSigmaGraph({
             className={cn(
               "h-10 px-4 rounded-xl text-[11px] font-black border transition-all duration-300 uppercase tracking-widest flex items-center gap-2",
               insightMode
-                ? "border-amber-400/40 bg-amber-400/10 text-amber-600 shadow-sm"
-                : "border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50",
+                ? "border-violet-400/40 bg-violet-400/10 text-violet-600 shadow-sm"
+                : "border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-300 hover:text-slate-600 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-900",
             )}
             title={insightMode ? "Showing critical path only" : "Showing full architectural mess"}
           >
-            <div className={cn("w-2 h-2 rounded-full", insightMode ? "bg-amber-500 animate-pulse" : "bg-slate-300")} />
+            <div className={cn("w-2 h-2 rounded-full", insightMode ? "bg-violet-500 animate-pulse" : "bg-slate-300")} />
             {insightMode ? "Insight View" : "Full View"}
           </button>
 
-          <button
+          {/* <button
             onClick={() => {
               if (isolateFocus) {
                 setIsolateFocus(false);
@@ -844,7 +862,7 @@ export function GephiSigmaGraph({
           >
             <div className={cn("w-2 h-2 rounded-full", isolateFocus ? "bg-sky-500 animate-pulse" : "bg-slate-300")} />
             {isolateFocus ? "Isolated" : "Show All"}
-          </button>
+          </button> */}
 
           <div className="w-px h-6 bg-slate-200 mx-1" />
 
@@ -860,7 +878,7 @@ export function GephiSigmaGraph({
                 "h-10 px-4 rounded-xl text-[11px] font-black border transition-all duration-300 uppercase tracking-widest",
                 activeExtensions.has(ext)
                   ? "border-primary/40 bg-primary/10 text-primary shadow-sm"
-                  : "border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50",
+                  : "border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-300 hover:text-slate-600 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-900",
               )}
             >
               .{ext}
@@ -884,13 +902,13 @@ export function GephiSigmaGraph({
               ))}
             </div>
           )}
-          <div className="hidden xl:flex flex-col items-end opacity-40">
-            <span className="text-[11px] font-black text-slate-800 uppercase tracking-widest leading-none">{nodes.length} COMPONENTS</span>
-            <span className="text-[10px] text-slate-500 font-mono tracking-tighter uppercase">{edges.length} LINKS</span>
+          <div className={cn("hidden xl:flex flex-col items-end", theme === "dark" ? "opacity-80" : "opacity-50")}>
+            <span className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest leading-none">{nodes.length} COMPONENTS</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono tracking-tighter uppercase">{edges.length} LINKS</span>
           </div>
           <button
             onClick={handleToggleExpanded}
-            className="p-3 rounded-2xl bg-white border border-slate-200/60 text-slate-400 hover:text-primary transition-all hover:border-primary/30 active:scale-95 shadow-sm"
+            className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700 text-slate-400 dark:text-slate-300 hover:text-primary transition-all hover:border-primary/30 active:scale-95 shadow-sm"
             title={isExpanded ? "Collapse graph" : "Expand graph"}
           >
             {isExpanded ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
@@ -900,8 +918,40 @@ export function GephiSigmaGraph({
 
       {/* Luxury Canvas Area */}
       <div className="relative flex-1 min-h-0">
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-0",
+            theme === "dark"
+              ? "bg-transparent"
+              : "bg-[radial-gradient(circle_at_22%_28%,rgba(14,165,233,0.09),transparent_44%),radial-gradient(circle_at_78%_65%,rgba(168,85,247,0.07),transparent_50%)]",
+          )}
+        />
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-0",
+            theme === "dark" ? "opacity-0" : "opacity-25",
+          )}
+          style={{
+            backgroundImage:
+              theme === "dark"
+                ? "linear-gradient(rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.08) 1px, transparent 1px)"
+                : "linear-gradient(rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.05) 1px, transparent 1px)",
+            backgroundSize: "34px 34px",
+          }}
+        />
+        <div
+          className={cn(
+            "pointer-events-none absolute left-6 top-5 z-10 flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-[0_4px_24px_rgba(14,165,233,0.18)] backdrop-blur-md",
+            theme === "dark"
+              ? "border-cyan-400/25 bg-slate-900/75"
+              : "border-cyan-200/70 bg-white/75",
+          )}
+        >
+          <div className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse" />
+          <span className={cn("text-[10px] font-semibold tracking-[0.18em] uppercase", theme === "dark" ? "text-slate-200" : "text-slate-600")}>AI Graph Mode</span>
+        </div>
         {isInitializing && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/40 backdrop-blur-xl">
+          <div className={cn("absolute inset-0 z-10 flex flex-col items-center justify-center backdrop-blur-xl", theme === "dark" ? "bg-slate-950/45" : "bg-white/40")}>
             <div className="relative">
               <div className="absolute inset-0 blur-2xl bg-primary/20 animate-pulse rounded-full" />
               <Loader2 className="h-12 w-12 animate-spin text-primary/40 relative z-10" />
@@ -942,6 +992,7 @@ export function GephiSigmaGraph({
             insightMode={insightMode}
             isolateFocus={isolateFocus}
             isExpanded={isExpanded}
+            theme={theme}
           />
           <GraphTooltip node={hoveredNode} graph={graph} />
         </SigmaContainer>
@@ -949,7 +1000,7 @@ export function GephiSigmaGraph({
         {/* Persistent Selection Indicator (Minimal) */}
         {selectedNode && (
           <div className="absolute left-8 bottom-8 flex items-center gap-4 bg-white/70 backdrop-blur-2xl border border-slate-200/60 px-5 py-3 rounded-2xl shadow-xl animate-in slide-in-from-bottom-8 duration-700">
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)] animate-pulse" />
+            <div className="w-2.5 h-2.5 rounded-full bg-sky-500 shadow-[0_0_15px_rgba(14,165,233,0.45)] animate-pulse" />
             <div className="flex flex-col">
               <span className="text-[10px] font-black text-slate-800 uppercase tracking-tight truncate max-w-[240px]">
                 {baseName(selectedNode)}
